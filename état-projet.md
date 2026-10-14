@@ -62,7 +62,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - [ ] Choix du framework front pour la PWA → proposition ci-dessous, à valider.
 - [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
-- [ ] CORS Nextcloud : la PWA ne peut pas appeler le WebDAV Nextcloud depuis un autre domaine sans configuration. **Nextcloud chez un prestataire (pas d'accès admin)** → configuration serveur et même domaine impossibles. Pistes restantes :
+- [ ] CORS Nextcloud : la PWA ne peut pas appeler le WebDAV Nextcloud depuis un autre domaine sans configuration. **Nextcloud chez un prestataire TabDigital (`eli.it.tabdigital.cloud`, pas d'accès admin)**. Test du 2026-10-14 : requête WebDAV depuis un autre domaine **bloquée** (`Access-Control-Allow-Origin` absent, préflight OPTIONS → 401) → configuration serveur et même domaine impossibles. Pistes restantes :
   1. Demander au prestataire d'installer/activer l'app Nextcloud **WebAppPassword** (ajoute les en-têtes CORS pour une origine donnée) ou d'autoriser CORS.
   2. Petit **proxy** (ex. Cloudflare Worker gratuit) entre la PWA et Nextcloud. Attention : les identifiants transitent par le proxy → utiliser un **mot de passe d'application Nextcloud** dédié et révocable.
   3. Plus tard, NAS auto-hébergé : CORS / même domaine configurables, problème résolu.
@@ -98,3 +98,4 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | 2026-10-14 | Quantités qualitatives : 3 niveaux (plus beaucoup / moyen / suffisamment). |
 | 2026-10-14 | Application en PWA pour l'installation sur appareils Apple. |
 | 2026-10-14 | Nextcloud hébergé par un prestataire : pas d'accès admin serveur. |
+| 2026-10-14 | Test CORS : bloqué. Demande à envoyer au prestataire ; repli = proxy. |
