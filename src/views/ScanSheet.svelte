@@ -2,7 +2,8 @@
   import { onDestroy } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { lookup, rememberProduct, startScanner, validCode } from '../lib/barcode';
-  import { AISLES } from '../lib/aisles';
+  import { readPhoto, suggest } from '../lib/ocr';
+  import { AISLES, guessAisle } from '../lib/aisles';
   import { LOCATIONS, guessLocation } from '../lib/locations.svelte';
   import { addItem } from '../lib/shopping';
   import { addStock } from '../lib/stock';
@@ -15,7 +16,7 @@
     onclose
   }: { mode: 'stock' | 'courses'; locationId?: string; onclose: () => void } = $props();
 
-  type Step = 'scan' | 'loading' | 'product';
+  type Step = 'scan' | 'loading' | 'ocr' | 'product';
   let step = $state<Step>('scan');
   let video = $state<HTMLVideoElement>();
   let stop: (() => void) | undefined;
@@ -72,6 +73,38 @@
     step = 'product';
   }
 
+  /* ---------- Photo de l'emballage (OCR) ---------- */
+  let names = $state<string[]>([]);
+  let progress = $state(0);
+  let ocrError = $state('');
+
+  async function photo(e: Event) {
+    const file = (e.currentTarget as HTMLInputElement).files?.[0];
+    if (!file) return;
+    stop?.();
+    ocrError = '';
+    progress = 0;
+    step = 'ocr';
+    try {
+      const found = suggest(await readPhoto(file, (p) => (progress = p)));
+      code = '';
+      known = false;
+      names = found.names;
+      form = { ...form, brand: '', image: URL.createObjectURL(file), qty: found.qty ?? '', count: 1 };
+      pickName(found.names[0] ?? '');
+      step = 'product';
+    } catch {
+      ocrError = "Lecture de la photo impossible (première utilisation : connexion internet nécessaire).";
+      step = 'scan';
+    }
+  }
+
+  /** Nom choisi parmi le texte lu : rayon et emplacement devinés d'après le nom. */
+  function pickName(n: string) {
+    const aisleId = guessAisle(n);
+    form = { ...form, name: n, aisleId, locationId: locationId ?? guessLocation(aisleId) };
+  }
+
   function submitManual(e: SubmitEvent) {
     e.preventDefault();
     const c = manual.replace(/\D/g, '');
@@ -91,7 +124,7 @@
     const name = form.name.trim();
     if (!name) return;
     const parsedQty = form.qty.trim().match(/^(\d+(?:[.,]\d+)?)\s*(g|kg|ml|cl|l)?$/i);
-    await rememberProduct({
+    if (code) await rememberProduct({
       code,
       name,
       brand: form.brand || undefined,
@@ -99,7 +132,7 @@
       unit: parsedQty ? ((parsedQty[2]?.toLowerCase() as Product['unit']) ?? 'pièce') : undefined,
       aisleId: form.aisleId,
       locationId: form.locationId,
-      image: form.image || undefined
+      image: form.image.startsWith('blob:') ? undefined : form.image || undefined
     });
     if (mode === 'stock') await addStock(`${name} ${total()}`, form.locationId, undefined, form.aisleId);
     else await addItem(name, form.count > 1 ? `x${form.count}` : '', form.aisleId);
@@ -107,6 +140,7 @@
     added = name;
     setTimeout(() => (added = ''), 2500);
     manual = '';
+    names = [];
     step = 'scan';
   }
 
@@ -133,6 +167,14 @@
       <button class="btn" type="submit" disabled={!manual.trim()}>OK</button>
     </form>
     {#if manual.trim() && !valid}<p class="hint">Code EAN de 8 ou 13 chiffres.</p>{/if}
+    <label class="btn ghost photo">
+      📸 Pas de code-barres ? Photo de l'emballage
+      <input type="file" accept="image/*" capture="environment" onchange={photo} hidden />
+    </label>
+    {#if ocrError}<p class="err">{ocrError}</p>{/if}
+  {:else if step === 'ocr'}
+    <p class="loading">🔤 Lecture de l'emballage… {Math.round(progress * 100)} %</p>
+    <div class="bar"><div style="width: {progress * 100}%"></div></div>
   {:else if step === 'loading'}
     <p class="loading">🔎 Recherche du produit {code}…</p>
   {:else}
@@ -142,12 +184,21 @@
         <div>
           {#if known}
             <p class="found">{form.brand ? form.brand + ' · ' : ''}code {code}</p>
+          {:else if !code}
+            <p class="found">Texte lu sur la photo : choisis le nom ou corrige-le.</p>
           {:else}
             <p class="unknown">Produit inconnu (code {code}). Donne-lui un nom, il sera reconnu la prochaine fois.</p>
           {/if}
         </div>
       </div>
       <input bind:value={form.name} placeholder="Nom du produit" aria-label="Nom du produit" />
+      {#if names.length > 1}
+        <div class="chips">
+          {#each names as n}
+            <button type="button" class="chip" class:sel={form.name === n} onclick={() => pickName(n)}>{n}</button>
+          {/each}
+        </div>
+      {/if}
       <div class="row">
         <label>
           <span class="lbl">Contenance</span>
@@ -240,7 +291,10 @@
   .manual { display: flex; gap: 8px; }
   .manual .btn { flex: none; }
   .btn:disabled { opacity: 0.4; }
-  .loading { text-align: center; padding: 40px 0; color: var(--muted); }
+  .loading { text-align: center; padding: 40px 0 8px; color: var(--muted); }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .bar div { height: 100%; background: var(--green); transition: width 0.3s; }
+  .photo { text-align: center; }
 
   .product { display: flex; flex-direction: column; gap: 12px; }
   .card { display: flex; gap: 12px; align-items: center; }
