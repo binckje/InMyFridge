@@ -111,7 +111,7 @@ export function parseIngredient(line: string): RecipeIngredient {
   let s = line.trim().replace(/\s+/g, ' ');
   const optional = /\((?:facultatif|optionnel)\)/i.test(s);
   s = s.replace(/\((?:facultatif|optionnel)\)/i, '').trim();
-  const m = s.match(new RegExp(`^(\\d+(?:[.,/]\\d+)?)\\s*${UNIT_RE}?\\s*(?:de |d['’])?(.+)$`, 'i'));
+  const m = s.match(new RegExp(`^(\\d+(?:[.,/]\\d+)?)\\s*(?:${UNIT_RE}(?=[\\s'’]|$))?\\s*(?:de |d['’])?(.+)$`, 'i'));
   let out: RecipeIngredient;
   if (m) {
     const [, n, unit, name] = m;
@@ -225,7 +225,8 @@ export interface Consumption {
 export async function cook(check: RecipeCheck, scale = 1): Promise<Consumption[]> {
   const done: Consumption[] = [];
   for (const c of check.checks) {
-    const s = c.stock[0];
+    // relu en base : deux ingrédients peuvent viser le même produit (« 2 oeufs » + « 1 oeuf »)
+    const s = c.stock[0] && (await db.stock.get(c.stock[0].id));
     if (!s || c.status === 'basic' || c.ingredient.optional) continue;
     if (s.level) {
       const next = s.level === 'suffisamment' ? 'moyen' : 'plus beaucoup';
@@ -247,7 +248,7 @@ export async function cook(check: RecipeCheck, scale = 1): Promise<Consumption[]
 }
 
 export async function undoCook(done: Consumption[]) {
-  for (const d of done) await updateStock(d.id, d.before);
+  for (const d of [...done].reverse()) await updateStock(d.id, d.before);
 }
 
 export async function saveRecipe(r: Omit<Recipe, 'id' | 'updatedAt' | 'createdAt'> & { id?: string }) {

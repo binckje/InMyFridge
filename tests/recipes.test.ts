@@ -24,6 +24,10 @@ describe('parseIngredient', () => {
     expect(parseIngredient('2 c. à soupe d’huile')).toEqual({ name: 'huile', qty: 2, unit: 'c. à soupe' });
     expect(parseIngredient('1 cube de bouillon')).toEqual({ name: 'bouillon', qty: 1, unit: 'cube' });
     expect(parseIngredient('sel')).toEqual({ name: 'sel' });
+    expect(parseIngredient('1 gousse d’ail')).toEqual({ name: 'ail', qty: 1, unit: 'gousse' });
+    expect(parseIngredient('2 gros oignons')).toEqual({ name: 'gros oignons', qty: 2, unit: 'pièce' });
+    expect(parseIngredient('2 laitues')).toEqual({ name: 'laitues', qty: 2, unit: 'pièce' });
+    expect(parseIngredient('200g farine')).toEqual({ name: 'farine', qty: 200, unit: 'g' });
     expect(parseIngredient('1/2 citron')).toMatchObject({ name: 'citron', qty: 0.5 });
     expect(parseIngredient('50 g fromage (facultatif)')).toMatchObject({ name: 'fromage', optional: true });
   });
@@ -92,6 +96,16 @@ describe('checkRecipe / cook', () => {
     await undoCook(done);
     expect((await db.stock.get(eggs.id))?.qty).toBe(6);
     expect((await db.stock.get(butter.id))?.level).toBe('suffisamment');
+  });
+
+  it('cuisiner : deux ingrédients sur le même produit', async () => {
+    const eggs = (await addStock('oeufs 10', 'frigo'))!;
+    const r = { id: 'x', name: 'x', servings: 1, steps: [], source: 'perso' as const, createdAt: 0, updatedAt: 0,
+      ingredients: [parseIngredient('2 oeufs'), parseIngredient('1 oeuf')] };
+    const done = await cook(checkRecipe(r, await db.stock.toArray()));
+    expect((await db.stock.get(eggs.id))?.qty).toBe(7);
+    await undoCook(done);
+    expect((await db.stock.get(eggs.id))?.qty).toBe(10);
   });
 
   it('manquants → liste de courses', async () => {
