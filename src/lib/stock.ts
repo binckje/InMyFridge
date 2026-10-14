@@ -5,6 +5,12 @@ import { LEVELS, type Level, type StockItem, type Unit } from './types';
 
 export const UNITS: Unit[] = ['pièce', 'g', 'kg', 'ml', 'cl', 'l'];
 
+/** Type de quantité choisi à la saisie : une unité, ou un niveau qualitatif. */
+export type QtyKind = Unit | 'level';
+
+/** Type déduit du texte tapé (« lait 2 l » → l, « oeufs 6 » → pièce, « beurre » → niveau). */
+export const detectKind = (input: string): QtyKind => parseStock(input.trim()).unit ?? 'level';
+
 /** Pas des boutons − / + selon l'unité. */
 const STEP: Record<Unit, number> = { pièce: 1, g: 100, kg: 0.25, ml: 100, cl: 10, l: 0.25 };
 
@@ -27,8 +33,15 @@ export function parseStock(input: string): { name: string; qty?: number; unit?: 
 }
 
 /** Ajout rapide. Si le produit existe déjà au même endroit : on additionne (ou on remplace). */
-export async function addStock(input: string, locationId?: string): Promise<StockItem | undefined> {
-  const { name, qty, unit } = parseStock(input.trim());
+export async function addStock(
+  input: string,
+  locationId?: string,
+  kind: QtyKind = detectKind(input)
+): Promise<StockItem | undefined> {
+  const parsed = parseStock(input.trim());
+  const name = parsed.name;
+  const unit = kind === 'level' ? undefined : kind;
+  const qty = unit ? (parsed.qty ?? 1) : undefined;
   const clean = name.trim();
   if (!clean) return;
   const aisleId = await aisleFor(clean);

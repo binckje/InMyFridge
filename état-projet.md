@@ -68,6 +68,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - **Emplacements fixes (v1)** en puces défilantes : Tout · ⚠️ Bas · les 6 emplacements (compteur). Frigo et congélateur regroupés par sous-catégorie, « Tout » regroupé par emplacement.
 - **Champ unique chercher / ajouter** : filtre la liste en tapant ; ＋ ajoute dans l'emplacement affiché (deviné via le rayon si « Tout »). « lait 2 l », « riz 1 kg », « oeufs x6 ». Sans quantité → suivi par **niveau** (seuil par défaut « plus beaucoup »).
+- **Choix du type de quantité à l'ajout** : puces sous le champ (🔢 Nombre · 📊 Niveau · g · kg · ml · cl · l), présélectionnées d'après le texte tapé, modifiables. Sans nombre tapé : 1.
 - Produit déjà présent au même endroit : quantités additionnées (même unité), sinon remplacées.
 - **Boutons − / +** : pièce ±1, g/ml ±100, cl ±10, kg/l ±0,25 ; niveau : niveau précédent / suivant (couleur rouge/orange/vert).
 - **Tap sur le nom** → feuille : nom, emplacement, catégorie, mode Quantité (valeur + unité + seuil) ou Niveau (niveau + seuil), suppression annulable 4 s.
@@ -160,3 +161,4 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 | 2026-10-14 | `typescript@~6` (svelte-check ne supporte pas encore TS 7 seul). |
 | 2026-10-14 | Fusion sur `main`, GitHub Pages activé, PWA testée et fonctionnelle. |
 | 2026-10-14 | Écran Stock : emplacements figés v1, saisie rapide + feuille, boutons − / +. |
+| 2026-10-14 | Stock : choix du type de quantité à la saisie (puces). |

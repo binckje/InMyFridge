@@ -5,7 +5,7 @@
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations';
   import { isLow } from '../lib/shopping';
-  import { UNITS, addStock, adjust, deleteStock, formatQty, parseStock, updateStock } from '../lib/stock';
+  import { UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatQty, parseStock, updateStock } from '../lib/stock';
   import { LEVELS, type Level, type StockItem, type Unit } from '../lib/types';
 
   const items = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
@@ -50,14 +50,33 @@
   const target = $derived(LOCATIONS.find((l) => l.id === filter));
   async function submit(e: SubmitEvent) {
     e.preventDefault();
-    const added = await addStock(text, target?.id);
+    const input = text;
+    const k = qtyKind;
+    text = '';
+    kind = null;
+    const added = await addStock(input, target?.id, k);
     if (!added) return;
     buzz();
-    text = '';
     flash = added.id;
     setTimeout(() => (flash = null), 1200);
   }
   let flash = $state<string | null>(null);
+
+  /** Type de quantité : deviné depuis le texte, modifiable via les puces. */
+  let kind = $state<QtyKind | null>(null);
+  $effect(() => {
+    if (!text.trim()) kind = null;
+  });
+  const qtyKind = $derived(kind ?? detectKind(text));
+  const KINDS: { id: QtyKind; label: string }[] = [
+    { id: 'pièce', label: '🔢 Nombre' },
+    { id: 'level', label: '📊 Niveau' },
+    { id: 'g', label: 'g' },
+    { id: 'kg', label: 'kg' },
+    { id: 'ml', label: 'ml' },
+    { id: 'cl', label: 'cl' },
+    { id: 'l', label: 'l' }
+  ];
 
   /* ---------- Édition ---------- */
   let editing = $state<StockItem | null>(null);
@@ -173,6 +192,17 @@
   />
   <button class="btn" type="submit" aria-label="Ajouter" disabled={!text.trim()}>＋</button>
 </form>
+
+{#if text.trim()}
+  <div class="kinds" transition:slide={{ duration: 150 }}>
+    {#each KINDS as k (k.id)}
+      <button type="button" class="chip" class:sel={qtyKind === k.id} onclick={() => (kind = k.id)}>{k.label}</button>
+    {/each}
+  </div>
+  <p class="hint kind-hint">
+    {#if qtyKind === 'level'}Ajouté au niveau « suffisamment ».{:else}Quantité : tape le nombre dans le texte (sinon 1).{/if}
+  </p>
+{/if}
 
 {#if all.length === 0}
   <div class="empty" in:fade>
@@ -322,6 +352,9 @@
   .add .btn { width: 48px; flex: none; padding: 0; font-size: 22px; }
   .add .btn:disabled { opacity: 0.4; }
 
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kinds .chip { padding: 5px 11px; font-size: 14px; }
+  .kind-hint { margin: 6px 0 0; color: var(--muted); }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip {
     padding: 6px 12px;
