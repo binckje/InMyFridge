@@ -1,0 +1,36 @@
+import Dexie, { type EntityTable } from 'dexie';
+import type { ShoppingItem, StockItem } from './types';
+
+/** Mémoire des articles déjà achetés : rayon retenu + fréquence (pour les suggestions). */
+export interface Memory {
+  key: string; // nom normalisé
+  name: string;
+  aisleId: string;
+  count: number;
+  lastUsed: number;
+}
+
+export const db = new Dexie('inmyfridge') as Dexie & {
+  stock: EntityTable<StockItem, 'id'>;
+  shopping: EntityTable<ShoppingItem, 'id'>;
+  memory: EntityTable<Memory, 'key'>;
+};
+
+db.version(1).stores({
+  stock: 'id, aisleId, updatedAt',
+  shopping: 'id, aisleId, checked, stockItemId, updatedAt',
+  memory: 'key, count, lastUsed'
+});
+
+export const newId = () => crypto.randomUUID();
+
+/** Demande au navigateur de ne pas purger les données (important sur iOS). */
+export async function requestPersistence() {
+  try {
+    if (navigator.storage?.persist && !(await navigator.storage.persisted())) {
+      await navigator.storage.persist();
+    }
+  } catch {
+    /* non supporté : tant pis */
+  }
+}

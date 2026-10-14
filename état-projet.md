@@ -4,7 +4,11 @@ _Dernière mise à jour : 2026-10-14_
 
 ## Statut
 
-Phase : **cadrage / spécifications**. Aucun code. Seul ce fichier évolue pour l'instant.
+Phase : **développement — squelette PWA en place**.
+
+- Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, workflow de déploiement GitHub Pages.
+- Écrans Stock et Recettes : vides (message « bientôt »).
+- Pas encore : synchro Google Drive, saisie du stock, scan, OCR, recettes.
 
 ## Objectif
 
@@ -46,7 +50,20 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - Notation des recettes.
 - Enregistrement d'une recette trouvée sur internet dans la base locale.
 
-## 5. Stockage et synchronisation
+## 5. Liste de courses (implémentée)
+
+- Onglet par défaut à l'ouverture (usage principal en magasin, sur mobile).
+- **Saisie rapide** en une ligne, quantité reconnue : « 2 l lait », « pâtes 500g », « yaourt x4 ».
+- **Rayon deviné automatiquement** (mots-clés), puis **mémorisé** par article (si on corrige le rayon, l'app s'en souvient).
+- **Suggestions** : articles les plus souvent achetés, proposés en puces sous le champ de saisie.
+- **Pas de doublon** : ajouter un article déjà présent met juste à jour sa quantité.
+- **Regroupement par rayon** (emoji + compteur), dans l'ordre du parcours en magasin.
+- **Édition manuelle** : tap sur un article → feuille (nom, quantité, rayon, suppression). Suppression annulable 4 s.
+- **Cocher = dans le panier** : article barré en bas, barre de progression, badge du nombre restant sur l'onglet, célébration 🎉 quand tout est coché, bouton « Vider le panier ».
+- **Ajout auto sous seuil** : `syncLowStock()` ajoute les produits du stock sous leur seuil (étiquette « stock bas ») et retire ceux remontés. Actif dès que le stock sera saisi.
+- Suppressions logiques (`deleted`) + `updatedAt` sur chaque enregistrement → prêt pour la synchro.
+
+## 6. Stockage et synchronisation
 
 - Données stockées sur chaque appareil (fonctionnement hors ligne).
 - Synchronisation via **Google Drive** (phase 1), dans un **dossier partagé** « InMyFridge » :
@@ -59,7 +76,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - Plus tard : synchronisation via **NAS**.
 - Synchro écrite derrière une interface commune (adaptateurs) pour changer de fournisseur sans tout réécrire.
 
-## 6. Plateformes cibles
+## 7. Plateformes cibles
 
 - Phase 1 : **Linux** et **iOS** (pas de compte Apple Developer pour l'instant).
 - Format : **PWA** (application web installable) — installation sur appareils Apple via Safari « Ajouter à l'écran d'accueil ».
@@ -93,6 +110,28 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installation native), React Native (idem), React/Vue (viables mais plus lourds que Svelte pour ce projet).
 
+## Structure du code
+
+| Fichier | Rôle |
+|---------|------|
+| `src/App.svelte` | Onglets du bas, routage par `#hash` |
+| `src/views/Courses.svelte` | Écran liste de courses |
+| `src/views/Stock.svelte`, `Recettes.svelte` | Écrans à venir |
+| `src/lib/types.ts` | Modèle de données (StockItem, ShoppingItem, Aisle) |
+| `src/lib/db.ts` | Base Dexie (tables `stock`, `shopping`, `memory`) + stockage persistant |
+| `src/lib/shopping.ts` | Logique courses (ajout, édition, suggestions, lien stock → courses) |
+| `src/lib/aisles.ts` | Rayons par défaut + devinette du rayon |
+| `.github/workflows/deploy.yml` | Build + publication GitHub Pages sur push `main` |
+
+Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le téléphone sur le même Wi-Fi), `npm run check`, `npm run build`.
+
+## Prochaines étapes
+
+1. Activer GitHub Pages (Settings → Pages → Source : GitHub Actions) et fusionner sur `main`.
+2. Écran Stock : saisie manuelle, emplacements, quantités / niveaux, seuils.
+3. Synchro Google Drive (adaptateur).
+4. Scan code-barres + Open Food Facts.
+
 ## Journal des décisions
 
 | Date | Décision |
@@ -105,3 +144,5 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | 2026-10-14 | Nextcloud abandonné pour l'instant. Synchro phase 1 = **Google Drive**. |
 | 2026-10-14 | Stack validée : Svelte 5 + Vite + TypeScript, hébergement **GitHub Pages**. |
 | 2026-10-14 | Foyer de 2 utilisateurs, comptes Google séparés : dossier Drive partagé + portée `drive.file` + Google Picker (abandon de `appDataFolder`, non partageable). |
+| 2026-10-14 | Squelette PWA créé. Liste de courses : saisie rapide, rayon deviné + mémorisé, suggestions, cocher, regroupement par rayon, ajout auto sous seuil. |
+| 2026-10-14 | `typescript@~6` (svelte-check ne supporte pas encore TS 7 seul). |
