@@ -49,8 +49,10 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 ## 5. Stockage et synchronisation
 
 - Données stockées sur chaque appareil (fonctionnement hors ligne).
-- Synchronisation via **Nextcloud** (phase 1).
+- Synchronisation via **Google Drive** (phase 1), dans le dossier caché propre à l'app (`appDataFolder`).
+- Nextcloud mis de côté (hébergeur TabDigital bloque CORS, voir historique).
 - Plus tard : synchronisation via **NAS**.
+- Synchro écrite derrière une interface commune (adaptateurs) pour changer de fournisseur sans tout réécrire.
 
 ## 6. Plateformes cibles
 
@@ -62,11 +64,10 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - [ ] Choix du framework front pour la PWA → proposition ci-dessous, à valider.
 - [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
-- [ ] CORS Nextcloud : la PWA ne peut pas appeler le WebDAV Nextcloud depuis un autre domaine sans configuration. **Nextcloud chez un prestataire TabDigital (`eli.it.tabdigital.cloud`, pas d'accès admin)**. Test du 2026-10-14 : requête WebDAV depuis un autre domaine **bloquée** (`Access-Control-Allow-Origin` absent, préflight OPTIONS → 401) → configuration serveur et même domaine impossibles. Pistes restantes :
-  1. Demander au prestataire d'installer/activer l'app Nextcloud **WebAppPassword** (ajoute les en-têtes CORS pour une origine donnée) ou d'autoriser CORS.
-  2. Petit **proxy** (ex. Cloudflare Worker gratuit) entre la PWA et Nextcloud. Attention : les identifiants transitent par le proxy → utiliser un **mot de passe d'application Nextcloud** dédié et révocable.
-  3. Plus tard, NAS auto-hébergé : CORS / même domaine configurables, problème résolu.
-- [ ] Format de synchro Nextcloud (WebDAV + fichier JSON/SQLite ? gestion des conflits multi-appareils).
+- [ ] Google Drive : créer le projet Google Cloud + identifiant client OAuth (type « Application Web », origines JavaScript autorisées = URL d'hébergement de la PWA). Portée visée : `drive.appdata` (accès limité aux données de l'app).
+- [ ] Google Drive : connexion OAuth dans une PWA installée sur iOS (mode plein écran) — les popups peuvent mal se comporter → prévoir le mode redirection. Jeton valable 1 h, renouvellement à gérer.
+- [ ] Format de synchro (fichier JSON par appareil, horodatage, gestion des conflits).
+- [ ] Hébergement de la PWA (ex. GitHub Pages, gratuit, HTTPS).
 - [ ] Source de données code-barres (ex. Open Food Facts).
 - [ ] Moteur OCR (local ou service en ligne).
 - [ ] Source(s) de recettes internet.
@@ -80,7 +81,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 | Framework UI | **Svelte 5 + Vite** (SPA statique) | Léger, rapide sur mobile, peu de code, build statique facile à héberger (y compris sur Nextcloud/NAS) |
 | PWA (installation, hors ligne) | **vite-plugin-pwa** (Workbox) | Manifest + service worker générés automatiquement |
 | Stockage local | **IndexedDB via Dexie.js** | Requêtes simples, versions de schéma, adapté à la synchro |
-| Synchro Nextcloud | **webdav** (client JS) + fichier JSON horodaté par appareil | Fusion par horodatage, pas de serveur à développer |
+| Synchro Google Drive | **Google Identity Services** (connexion) + **API Drive v3** via `fetch` + fichier JSON horodaté par appareil | Pas de serveur à développer, CORS supporté par Google |
 | Scan code-barres | **BarcodeDetector** natif, repli **@zxing/browser** | iOS Safari n'a pas BarcodeDetector → ZXing nécessaire |
 | Infos produit | **Open Food Facts** (API gratuite) | Nom, catégorie, image depuis le code-barres |
 | OCR emballage | **Tesseract.js** (local, dans le navigateur) | Gratuit, hors ligne, sans service tiers |
@@ -99,3 +100,4 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | 2026-10-14 | Application en PWA pour l'installation sur appareils Apple. |
 | 2026-10-14 | Nextcloud hébergé par un prestataire : pas d'accès admin serveur. |
 | 2026-10-14 | Test CORS : bloqué. Demande à envoyer au prestataire ; repli = proxy. |
+| 2026-10-14 | Nextcloud abandonné pour l'instant. Synchro phase 1 = **Google Drive**. |
