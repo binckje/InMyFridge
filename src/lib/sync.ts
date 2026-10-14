@@ -1,5 +1,5 @@
 import { db, type Memory } from './db';
-import type { ShoppingItem, StockItem } from './types';
+import type { Recipe, ShoppingItem, StockItem } from './types';
 
 /** Contenu du fichier de synchro partagé entre tous les appareils du foyer. */
 export interface Snapshot {
@@ -8,6 +8,8 @@ export interface Snapshot {
   stock: StockItem[];
   shopping: ShoppingItem[];
   memory: Memory[];
+  /** Absent des fichiers créés avant l'écran Recettes. */
+  recipes?: Recipe[];
 }
 
 /** Fournisseur de stockage distant (Google Drive aujourd'hui, Nextcloud / NAS plus tard). */
@@ -42,20 +44,23 @@ export interface SyncResult {
  */
 export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
   const remote = await provider.read();
-  const [stock, shopping, memory] = await Promise.all([
+  const [stock, shopping, memory, recipes] = await Promise.all([
     db.stock.toArray(),
     db.shopping.toArray(),
-    db.memory.toArray()
+    db.memory.toArray(),
+    db.recipes.toArray()
   ]);
 
   const s = mergeBy(stock, remote?.stock ?? [], (i) => i.id, (i) => i.updatedAt);
   const sh = mergeBy(shopping, remote?.shopping ?? [], (i) => i.id, (i) => i.updatedAt);
   const m = mergeBy(memory, remote?.memory ?? [], (i) => i.key, (i) => i.lastUsed);
+  const r = mergeBy(recipes, remote?.recipes ?? [], (i) => i.id, (i) => i.updatedAt);
 
-  await db.transaction('rw', db.stock, db.shopping, db.memory, async () => {
+  await db.transaction('rw', [db.stock, db.shopping, db.memory, db.recipes], async () => {
     await db.stock.bulkPut(s.changed);
     await db.shopping.bulkPut(sh.changed);
     await db.memory.bulkPut(m.changed);
+    await db.recipes.bulkPut(r.changed);
   });
 
   await provider.write({
@@ -63,8 +68,9 @@ export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
     savedAt: Date.now(),
     stock: s.all,
     shopping: sh.all,
-    memory: m.all
+    memory: m.all,
+    recipes: r.all
   });
 
-  return { received: s.changed.length + sh.changed.length + m.changed.length };
+  return { received: s.changed.length + sh.changed.length + m.changed.length + r.changed.length };
 }

@@ -57,3 +57,29 @@ export interface Aisle {
   emoji: string;
   order: number;
 }
+
+export interface RecipeIngredient {
+  name: string;
+  qty?: number;
+  /** Unité convertible (g, kg, ml, cl, l, pièce) ou libellé libre (« c. à soupe », « pincée »…). */
+  unit?: Unit | string;
+  optional?: boolean;
+}
+
+export interface Recipe extends SyncFields {
+  name: string;
+  emoji?: string;
+  servings: number;
+  /** Temps total en minutes. */
+  time?: number;
+  tags?: string[];
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  /** Note de 1 à 5. */
+  rating?: number;
+  /** base = fournie avec l'app, perso = saisie, web = importée d'internet. */
+  source: 'base' | 'perso' | 'web';
+  url?: string;
+  image?: string;
+  createdAt: number;
+}
