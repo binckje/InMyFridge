@@ -8,6 +8,7 @@ Phase : **développement — squelette PWA en place**.
 
 - Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, workflow de déploiement GitHub Pages.
 - Écrans Stock et Recettes : vides (message « bientôt »).
+- **En ligne** : https://binckje.github.io/InMyFridge/ (déployé et testé sur iPhone, hors ligne OK).
 - Pas encore : synchro Google Drive, saisie du stock, scan, OCR, recettes.
 
 ## Objectif
@@ -127,10 +128,9 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 
 ## Prochaines étapes
 
-1. Activer GitHub Pages (Settings → Pages → Source : GitHub Actions) et fusionner sur `main`.
-2. Écran Stock : saisie manuelle, emplacements, quantités / niveaux, seuils.
-3. Synchro Google Drive (adaptateur).
-4. Scan code-barres + Open Food Facts.
+1. Écran Stock : saisie manuelle, emplacements, quantités / niveaux, seuils.
+2. Synchro Google Drive (adaptateur).
+3. Scan code-barres + Open Food Facts.
 
 ## Journal des décisions
 
@@ -146,3 +146,4 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 | 2026-10-14 | Foyer de 2 utilisateurs, comptes Google séparés : dossier Drive partagé + portée `drive.file` + Google Picker (abandon de `appDataFolder`, non partageable). |
 | 2026-10-14 | Squelette PWA créé. Liste de courses : saisie rapide, rayon deviné + mémorisé, suggestions, cocher, regroupement par rayon, ajout auto sous seuil. |
 | 2026-10-14 | `typescript@~6` (svelte-check ne supporte pas encore TS 7 seul). |
+| 2026-10-14 | Fusion sur `main`, GitHub Pages activé, PWA testée et fonctionnelle. |
