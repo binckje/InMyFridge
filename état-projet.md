@@ -4,12 +4,12 @@ _Dernière mise à jour : 2026-10-14_
 
 ## Statut
 
-Phase : **développement — squelette PWA en place**.
+Phase : **développement — synchro Google Drive codée, à configurer**.
 
-- Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, **écran Stock fonctionnel**, workflow de déploiement GitHub Pages.
+- Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, **écran Stock fonctionnel**, **synchro Google Drive (code prêt, projet Google Cloud à configurer)**, workflow de déploiement GitHub Pages.
 - Écran Recettes : vide (message « bientôt »).
 - **En ligne** : https://binckje.github.io/InMyFridge/ (déployé et testé sur iPhone, hors ligne OK).
-- Pas encore : synchro Google Drive, scan, OCR, recettes, configuration des emplacements.
+- Pas encore : scan, OCR, recettes, configuration des emplacements.
 
 ## Objectif
 
@@ -87,6 +87,16 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - Plus tard : synchronisation via **NAS**.
 - Synchro écrite derrière une interface commune (adaptateurs) pour changer de fournisseur sans tout réécrire.
 
+### Implémentation (faite)
+
+- **Déclenchement manuel** : icône ☁️ en haut à droite → feuille Synchro (compte, dernière synchro, bouton « Synchroniser maintenant », déconnexion).
+- **Un seul fichier** `inmyfridge-data.json` dans le dossier « InMyFridge » (plus simple que 1 fichier/appareil avec `drive.file` : l'autre membre n'a besoin de choisir qu'un fichier, une seule fois).
+- Synchro = lire le fichier → fusion **dernière modif gagne par enregistrement** (`updatedAt` ; `lastUsed` pour la mémoire des rayons) → réécrire. Chaque appareil garde tout en local : si deux synchros se croisent, la suivante réintègre ce qui a été écrasé.
+- Connexion OAuth par **redirection** (pas de popup, compatible PWA iOS). Jeton 1 h ; à expiration, nouvelle redirection automatique (adresse pré-remplie).
+- Premier appareil : « Créer le dossier » ; autre compte : « Choisir le fichier partagé » (Google Picker). Même compte sur un autre appareil : fichier retrouvé automatiquement.
+- Identifiants lus au build : `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_API_KEY`, `VITE_GOOGLE_APP_ID` (variables GitHub `GOOGLE_CLIENT_ID`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` ; en local `.env.local`, voir `.env.example`).
+- Code : `src/lib/sync.ts` (fusion, interface `SyncProvider`), `src/lib/drive.ts` (OAuth, Drive, Picker), `src/views/SyncSheet.svelte`.
+
 ## 7. Plateformes cibles
 
 - Phase 1 : **Linux** et **iOS** (pas de compte Apple Developer pour l'instant).
@@ -96,9 +106,9 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 ## Questions ouvertes
 
 - [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
-- [ ] Google Drive : créer le projet Google Cloud + identifiant client OAuth (type « Application Web », origines JavaScript autorisées = URL d'hébergement de la PWA). Portée : `drive.file` + Google Picker (clé API nécessaire pour le Picker).
-- [ ] Google Drive : connexion OAuth dans une PWA installée sur iOS (mode plein écran) — les popups peuvent mal se comporter → prévoir le mode redirection. Jeton valable 1 h, renouvellement à gérer.
-- [ ] Format de synchro et **gestion des conflits** (prioritaire : 2 utilisateurs peuvent modifier en même temps). Piste : journal de modifications horodatées par appareil, fusion à la lecture.
+- [ ] Google Drive : **à faire par toi** — configurer le projet Google Cloud + identifiant client OAuth (type « Application Web », origines JavaScript autorisées = URL d'hébergement de la PWA). Portée : `drive.file` + Google Picker (clé API nécessaire pour le Picker).
+- [x] Google Drive : connexion OAuth dans une PWA installée sur iOS (mode plein écran) — les popups peuvent mal se comporter → mode redirection retenu. À valider sur iPhone.
+- [x] Format de synchro et **gestion des conflits** (prioritaire : 2 utilisateurs peuvent modifier en même temps). Retenu : fichier unique, dernière modif gagne par enregistrement.
 - [ ] Source de données code-barres (ex. Open Food Facts).
 - [ ] Moteur OCR (local ou service en ligne).
 - [ ] Source(s) de recettes internet.
@@ -134,6 +144,9 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/lib/shopping.ts` | Logique courses (ajout, édition, suggestions, lien stock → courses) |
 | `src/lib/stock.ts` | Logique stock (saisie rapide, −/+, édition, format) |
 | `src/lib/locations.ts` | Emplacements, sous-catégories, devinette |
+| `src/lib/sync.ts` | Fusion local ↔ distant, interface `SyncProvider` |
+| `src/lib/drive.ts` | Google Drive : OAuth (redirection), fichiers, Picker |
+| `src/views/SyncSheet.svelte` | Feuille Synchro (☁️) |
 | `src/lib/aisles.ts` | Rayons par défaut + devinette du rayon |
 | `.github/workflows/deploy.yml` | Build + publication GitHub Pages sur push `main` |
 
@@ -141,7 +154,7 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 
 ## Prochaines étapes
 
-1. Synchro Google Drive (adaptateur).
+1. Configurer Google Cloud + variables GitHub, tester la synchro à 2 comptes.
 2. Scan code-barres + Open Food Facts.
 3. Configuration des emplacements / catégories.
 
@@ -162,3 +175,4 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 | 2026-10-14 | Fusion sur `main`, GitHub Pages activé, PWA testée et fonctionnelle. |
 | 2026-10-14 | Écran Stock : emplacements figés v1, saisie rapide + feuille, boutons − / +. |
 | 2026-10-14 | Stock : choix du type de quantité à la saisie (puces). |
+| 2026-10-14 | Synchro Drive : manuelle (bouton), fichier unique partagé, dernière modif gagne, OAuth par redirection. |
