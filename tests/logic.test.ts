@@ -91,3 +91,28 @@ describe('sync', () => {
     expect(stored!.shopping).toHaveLength(1);
   });
 });
+
+describe('ranger les courses', () => {
+  it('quantités converties, niveaux remis à « suffisamment », nouveaux produits', async () => {
+    const { planRestock, applyRestock, convert } = await import('../src/lib/stock');
+    expect(convert(500, 'g', 'kg')).toBe(0.5);
+    expect(convert(1, 'l', 'g')).toBeUndefined();
+    const riz = (await addStock('riz 0,2 kg', 'epicerie-salee'))!;
+    const beurre = (await addStock('beurre', 'frigo'))!;
+    await addItem('riz', '500 g');
+    await addItem('beurre');
+    await addItem('pain');
+    const lines = (await planRestock(await db.shopping.toArray())).sort((a, b) => a.name.localeCompare(b.name));
+    expect(lines.map((l) => [l.name, l.qty, l.include])).toEqual([
+      ['beurre', '', true],
+      ['pain', '', false],
+      ['riz', '0,5', true]
+    ]);
+    await adjust(beurre, -1);
+    lines[1].include = true;
+    expect(await applyRestock(lines)).toBe(3);
+    expect((await db.stock.get(riz.id))?.qty).toBe(0.7);
+    expect((await db.stock.get(beurre.id))?.level).toBe('suffisamment');
+    expect((await db.stock.toArray()).some((s) => s.name === 'pain')).toBe(true);
+  });
+});

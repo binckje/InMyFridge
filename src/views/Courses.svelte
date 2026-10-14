@@ -6,7 +6,6 @@
   import { AISLES, aisleById } from '../lib/aisles';
   import {
     addItem,
-    clearChecked,
     deleteItem,
     suggestions,
     syncLowStock,
@@ -14,6 +13,7 @@
     updateItem
   } from '../lib/shopping';
   import type { ShoppingItem } from '../lib/types';
+  import RestockSheet from './RestockSheet.svelte';
 
   const items = liveQuery(() => db.shopping.filter((i) => !i.deleted).toArray());
 
@@ -110,6 +110,16 @@
     undo = null;
   }
 
+  /* ---------- Fin des courses : ranger dans le stock ---------- */
+  let restock = $state(false);
+  let stored = $state(0);
+  function restocked(n?: number) {
+    restock = false;
+    if (!n) return;
+    stored = n;
+    setTimeout(() => (stored = 0), 3000);
+  }
+
   const buzz = () => navigator.vibrate?.(12);
 </script>
 
@@ -191,7 +201,7 @@
         </li>
       {/each}
     </ul>
-    <button class="btn ghost clear" onclick={clearChecked}>Vider le panier ({done.length})</button>
+    <button class="btn ghost clear" onclick={() => (restock = true)}>🧺 Ranger et vider le panier ({done.length})</button>
   </section>
 {/if}
 
@@ -206,6 +216,14 @@
   <div class="toast" transition:fly={{ y: 40 }}>
     « {undo.name} » supprimé <button onclick={restore}>Annuler</button>
   </div>
+{/if}
+
+{#if restock}
+  <RestockSheet items={done} onclose={restocked} />
+{/if}
+
+{#if stored}
+  <div class="toast" transition:fly={{ y: 40 }}>🧊 {stored} produit{stored > 1 ? 's' : ''} rangé{stored > 1 ? 's' : ''} dans le stock</div>
 {/if}
 
 {#if editing}
