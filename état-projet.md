@@ -27,7 +27,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - **Solides** : unité de masse (g, kg) ou nombre de pièces.
 - **Liquides** : unité de volume (ml, cl, l).
-- **Difficile à évaluer** : niveau qualitatif dans une liste : `plus` · `moyen` · `suffisamment` · `beaucoup`.
+- **Difficile à évaluer** : niveau qualitatif sur 3 niveaux : `plus beaucoup` · `moyen` · `suffisamment`.
 - **Seuil d'alerte** par denrée (valeur numérique ou niveau qualitatif) → notification / liste de courses quand le stock passe sous le seuil.
 
 ## 3. Ajout de denrées
@@ -55,17 +55,17 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 ## 6. Plateformes cibles
 
 - Phase 1 : **Linux** et **iOS** (pas de compte Apple Developer pour l'instant).
+- Format : **PWA** (application web installable) — installation sur appareils Apple via Safari « Ajouter à l'écran d'accueil ».
 - Plus tard : Windows, Android.
 
 ## Questions ouvertes
 
-- [ ] Choix technique (framework multiplateforme) compatible Linux + iOS sans compte Apple Developer.
-- [ ] Mode d'installation iOS sans compte développeur (PWA ? sideload ?).
+- [ ] Choix du framework front pour la PWA.
+- [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
 - [ ] Format de synchro Nextcloud (WebDAV + fichier JSON/SQLite ? gestion des conflits multi-appareils).
 - [ ] Source de données code-barres (ex. Open Food Facts).
 - [ ] Moteur OCR (local ou service en ligne).
 - [ ] Source(s) de recettes internet.
-- [ ] Ordre exact des niveaux qualitatifs (« plus » = presque plus ?).
 - [ ] Gestion des dates de péremption ? (non demandé pour l'instant)
 - [ ] Multi-utilisateurs / foyer partagé ?
 
@@ -74,3 +74,5 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 | Date | Décision |
 |------|----------|
 | 2026-10-14 | Création du fichier, cahier des charges initial. |
+| 2026-10-14 | Quantités qualitatives : 3 niveaux (plus beaucoup / moyen / suffisamment). |
+| 2026-10-14 | Application en PWA pour l'installation sur appareils Apple. |
