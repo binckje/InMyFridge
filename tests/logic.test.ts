@@ -69,6 +69,27 @@ describe('courses', () => {
 });
 
 describe('sync', () => {
+  it('conflit : relit et refusionne sans perdre l’écriture de l’autre appareil', async () => {
+    const { SyncConflict } = await import('../src/lib/sync');
+    await addItem('pain');
+    const other = { id: 'b', name: 'beurre', aisleId: 'cremerie', checked: false, createdAt: 1, updatedAt: 1 };
+    let stored: Snapshot | null = { version: 1, savedAt: 0, stock: [], shopping: [], memory: [] };
+    let conflictOnce = true;
+    const provider: SyncProvider = {
+      read: async () => stored,
+      write: async (s) => {
+        if (conflictOnce) {
+          conflictOnce = false;
+          stored = { ...stored!, shopping: [other] }; // l'autre appareil écrit entre-temps
+          throw new SyncConflict();
+        }
+        stored = s;
+      }
+    };
+    await syncWith(provider);
+    expect(stored!.shopping.map((i) => i.name).sort()).toEqual(['beurre', 'pain']);
+  });
+
   it('fusionne : dernière modification gagne', async () => {
     await addItem('pain');
     const local = (await db.shopping.toArray())[0];
@@ -110,8 +131,9 @@ describe('ranger les courses', () => {
     ]);
     await adjust(beurre, -1);
     lines[1].include = true;
+    await db.stock.update(riz.id, { qty: 0.1 }); // modifié pendant que la feuille est ouverte
     expect(await applyRestock(lines)).toBe(3);
-    expect((await db.stock.get(riz.id))?.qty).toBe(0.7);
+    expect((await db.stock.get(riz.id))?.qty).toBe(0.6);
     expect((await db.stock.get(beurre.id))?.level).toBe('suffisamment');
     expect((await db.stock.toArray()).some((s) => s.name === 'pain')).toBe(true);
   });

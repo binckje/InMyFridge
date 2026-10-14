@@ -1,4 +1,4 @@
-import type { Snapshot, SyncProvider } from './sync';
+import { SyncConflict, type Snapshot, type SyncProvider } from './sync';
 
 /**
  * Synchro Google Drive. Connexion OAuth par redirection (les popups marchent mal
@@ -191,13 +191,28 @@ export async function pickFile(): Promise<string | null> {
 }
 
 export function driveProvider(fileId: string): SyncProvider {
+  /** Numéro de version Drive du fichier lu : sert à détecter une écriture concurrente. */
+  let readVersion: string | undefined;
+  const version = async () =>
+    (await (await api(`${API}/files/${fileId}?fields=version`)).json()).version as string | undefined;
   return {
     async read() {
+      readVersion = await version();
       const res = await api(`${API}/files/${fileId}?alt=media`);
-      const data = await res.json().catch(() => null);
-      return data?.version === 1 ? (data as Snapshot) : null;
+      const text = (await res.text()).trim();
+      if (!text || text === 'null') return null; // fichier tout juste créé
+      let data: Snapshot;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Fichier de synchro illisible : rien n’a été écrasé. Restaure une sauvegarde si besoin.');
+      }
+      if (data?.version !== 1)
+        throw new Error('Fichier de synchro écrit par une version plus récente de l’app : mets l’app à jour.');
+      return data;
     },
     async write(snapshot) {
+      if ((await version()) !== readVersion) throw new SyncConflict();
       await api(`${UPLOAD}/files/${fileId}?uploadType=media`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

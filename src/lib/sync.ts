@@ -14,11 +14,17 @@ export interface Snapshot {
   locations?: StoredLocation[];
 }
 
-/** Fournisseur de stockage distant (Google Drive aujourd'hui, Nextcloud / NAS plus tard). */
+/**
+ * Fournisseur de stockage distant (Google Drive aujourd'hui, Nextcloud / NAS plus tard).
+ * write() doit lever SyncConflict si le fichier a changé depuis le dernier read().
+ */
 export interface SyncProvider {
   read(): Promise<Snapshot | null>;
   write(snapshot: Snapshot): Promise<void>;
 }
+
+/** Le fichier distant a été modifié par un autre appareil entre la lecture et l'écriture. */
+export class SyncConflict extends Error {}
 
 /** Garde, pour chaque clé, la version la plus récente (dernière modification gagne). */
 function mergeBy<T>(local: T[], remote: T[], key: (t: T) => string, time: (t: T) => number) {
@@ -41,10 +47,19 @@ export interface SyncResult {
 
 /**
  * Lit le fichier distant, fusionne avec la base locale, puis réécrit le fichier fusionné.
- * Chaque appareil garde toutes ses données : si deux synchros se croisent,
- * la suivante réintègre ce qui aurait été écrasé.
+ * Si un autre appareil a écrit entre-temps, on relit et on refusionne (3 essais).
  */
 export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return { received: await syncOnce(provider) };
+    } catch (e) {
+      if (!(e instanceof SyncConflict) || attempt >= 3) throw e;
+    }
+  }
+}
+
+async function syncOnce(provider: SyncProvider): Promise<number> {
   const remote = await provider.read();
   const [stock, shopping, memory, recipes, products, locations] = await Promise.all([
     db.stock.toArray(),
@@ -82,5 +97,5 @@ export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
     locations: l.all
   });
 
-  return { received: s.changed.length + sh.changed.length + m.changed.length + r.changed.length + p.changed.length + l.changed.length };
+  return s.changed.length + sh.changed.length + m.changed.length + r.changed.length + p.changed.length + l.changed.length;
 }
