@@ -55,7 +55,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
   3. Chaque membre installe la PWA, se connecte avec **son propre compte Google**, et sélectionne le dossier une fois via **Google Picker**.
 - Portée OAuth : `drive.file` (l'app n'accède qu'aux fichiers qu'elle a créés ou que l'utilisateur a choisis).
 - Foyer : **2 utilisateurs** (moi + conjointe), chacun sur ses appareils. Les comptes sont ajoutés comme « utilisateurs test » dans la console Google (pas de validation Google nécessaire, avertissement « application non vérifiée » à la première connexion).
-- Nextcloud mis de côté (hébergeur TabDigital bloque CORS, voir historique).
+- Nextcloud mis de côté (hébergeur TabDigital bloque CORS). Option future : proxy **Cloudflare Worker** (gratuit) qui relaie les requêtes WebDAV vers `eli.it.tabdigital.cloud` en ajoutant les en-têtes CORS ; restreint à l'origine de la PWA et à `/remote.php/dav` ; authentification par mot de passe d'application Nextcloud propre à chaque utilisateur.
 - Plus tard : synchronisation via **NAS**.
 - Synchro écrite derrière une interface commune (adaptateurs) pour changer de fournisseur sans tout réécrire.
 
@@ -67,18 +67,16 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 ## Questions ouvertes
 
-- [ ] Choix du framework front pour la PWA → proposition ci-dessous, à valider.
 - [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
 - [ ] Google Drive : créer le projet Google Cloud + identifiant client OAuth (type « Application Web », origines JavaScript autorisées = URL d'hébergement de la PWA). Portée : `drive.file` + Google Picker (clé API nécessaire pour le Picker).
 - [ ] Google Drive : connexion OAuth dans une PWA installée sur iOS (mode plein écran) — les popups peuvent mal se comporter → prévoir le mode redirection. Jeton valable 1 h, renouvellement à gérer.
 - [ ] Format de synchro et **gestion des conflits** (prioritaire : 2 utilisateurs peuvent modifier en même temps). Piste : journal de modifications horodatées par appareil, fusion à la lecture.
-- [ ] Hébergement de la PWA (ex. GitHub Pages, gratuit, HTTPS).
 - [ ] Source de données code-barres (ex. Open Food Facts).
 - [ ] Moteur OCR (local ou service en ligne).
 - [ ] Source(s) de recettes internet.
 - [ ] Gestion des dates de péremption ? (non demandé pour l'instant)
 
-## Proposition de stack technique (à valider)
+## Stack technique (validée)
 
 | Besoin | Proposition | Pourquoi |
 |--------|-------------|----------|
@@ -105,4 +103,5 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | 2026-10-14 | Nextcloud hébergé par un prestataire : pas d'accès admin serveur. |
 | 2026-10-14 | Test CORS : bloqué. Demande à envoyer au prestataire ; repli = proxy. |
 | 2026-10-14 | Nextcloud abandonné pour l'instant. Synchro phase 1 = **Google Drive**. |
+| 2026-10-14 | Stack validée : Svelte 5 + Vite + TypeScript, hébergement **GitHub Pages**. |
 | 2026-10-14 | Foyer de 2 utilisateurs, comptes Google séparés : dossier Drive partagé + portée `drive.file` + Google Picker (abandon de `appDataFolder`, non partageable). |
