@@ -13,6 +13,11 @@ export type Unit = 'g' | 'kg' | 'ml' | 'cl' | 'l' | 'pièce';
 
 export interface StockItem extends SyncFields {
   name: string;
+  /** Emplacement (frigo, congélateur…), voir locations.ts. */
+  locationId: string;
+  /** Sous-catégorie (frigo / congélateur uniquement). */
+  categoryId?: string;
+  /** Rayon utilisé quand le produit part dans la liste de courses. */
   aisleId: string;
   /** Quantité numérique (avec unit) OU niveau qualitatif (level). */
   qty?: number;
@@ -31,6 +36,19 @@ export interface ShoppingItem extends SyncFields {
   createdAt: number;
   /** Ajouté automatiquement car ce produit du stock est sous son seuil. */
   stockItemId?: string;
+}
+
+export interface Category {
+  id: string;
+  label: string;
+  emoji: string;
+}
+
+export interface Location {
+  id: string;
+  label: string;
+  emoji: string;
+  categories?: Category[];
 }
 
 export interface Aisle {
