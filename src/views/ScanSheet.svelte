@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { lookup, rememberProduct, startScanner, validCode } from '../lib/barcode';
   import { readPhoto, suggest } from '../lib/ocr';
@@ -19,7 +18,6 @@
   type Step = 'scan' | 'loading' | 'ocr' | 'product';
   let step = $state<Step>('scan');
   let video = $state<HTMLVideoElement>();
-  let stop: (() => void) | undefined;
   let cameraError = $state('');
   let manual = $state('');
   let added = $state('');
@@ -28,33 +26,34 @@
   let known = $state(false);
   let form = $state({ name: '', brand: '', image: '', qty: '', aisleId: 'autre', locationId: '', count: 1 });
 
-  async function camera() {
-    cameraError = '';
-    if (!video) return;
-    try {
-      stop = await startScanner(video, found);
-    } catch (e) {
-      const name = (e as Error).name;
-      cameraError =
-        name === 'NotAllowedError'
-          ? "Accès à la caméra refusé. Autorise-le dans les réglages du navigateur, ou tape le code à la main."
-          : !window.isSecureContext
-            ? 'La caméra nécessite une connexion sécurisée (https). Tape le code à la main.'
-            : "Caméra indisponible. Tape le code à la main.";
-    }
-  }
-
+  /** Caméra allumée seulement à l'étape « scan » ; éteinte dès qu'on la quitte, même pendant son démarrage. */
   $effect(() => {
-    if (step === 'scan' && video) camera();
+    if (step !== 'scan' || !video) return;
+    let stop: (() => void) | undefined;
+    let left = false;
+    cameraError = '';
+    startScanner(video, found)
+      .then((s) => (left ? s() : (stop = s)))
+      .catch((e) => {
+        const name = (e as Error).name;
+        cameraError =
+          name === 'NotAllowedError'
+            ? "Accès à la caméra refusé. Autorise-le dans les réglages du navigateur, ou tape le code à la main."
+            : !window.isSecureContext
+              ? 'La caméra nécessite une connexion sécurisée (https). Tape le code à la main.'
+              : 'Caméra indisponible. Tape le code à la main.';
+      });
     return () => {
+      left = true;
       stop?.();
-      stop = undefined;
     };
   });
-  onDestroy(() => stop?.());
+
+  /** Dernier produit ajouté : évite de le rescanner aussitôt s'il est encore devant la caméra. */
+  let last = { code: '', at: 0 };
 
   async function found(c: string) {
-    if (step !== 'scan') return;
+    if (step !== 'scan' || (c === last.code && Date.now() - last.at < 4000)) return;
     navigator.vibrate?.(30);
     code = c;
     step = 'loading';
@@ -81,7 +80,6 @@
   async function photo(e: Event) {
     const file = (e.currentTarget as HTMLInputElement).files?.[0];
     if (!file) return;
-    stop?.();
     ocrError = '';
     progress = 0;
     step = 'ocr';
@@ -137,6 +135,7 @@
     if (mode === 'stock') await addStock(`${name} ${total()}`, form.locationId, undefined, form.aisleId);
     else await addItem(name, form.count > 1 ? `x${form.count}` : '', form.aisleId);
     navigator.vibrate?.(12);
+    last = { code, at: Date.now() };
     added = name;
     setTimeout(() => (added = ''), 2500);
     manual = '';
