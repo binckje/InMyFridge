@@ -50,6 +50,13 @@ describe('matches', () => {
     expect(matches('crème fraîche', 'creme fraiche épaisse')).toBe(true);
     expect(matches('beurre', 'pain')).toBe(false);
   });
+  it('produits précis → nom générique', () => {
+    expect(matches('pâtes', 'Spaghetti n°5')).toBe(true);
+    expect(matches('fromage râpé', 'Emmental râpé')).toBe(true);
+    expect(matches('boeuf haché', 'steak haché')).toBe(true);
+    expect(matches('huile', "huile de tournesol")).toBe(true);
+    expect(matches('emmental', 'comté')).toBe(false);
+  });
   it('noms composés', () => {
     expect(matches('pommes', 'pommes de terre')).toBe(false);
     expect(matches('pommes de terre', 'pomme de terre')).toBe(true);

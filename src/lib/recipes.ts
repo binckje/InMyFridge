@@ -60,10 +60,26 @@ export function tokens(name: string): string[] {
   return s.split(/\s+/).filter((w) => w && !STOP.has(w));
 }
 
+/** Produits précis → nom générique utilisé dans les recettes (« spaghetti » est une sorte de « pâtes »). */
+const KIND_OF: Record<string, string[]> = {
+  spaghetti: ['pate'], penne: ['pate'], tagliatelle: ['pate'], coquillette: ['pate'], fusilli: ['pate'],
+  macaroni: ['pate'], farfalle: ['pate'], linguine: ['pate'], torsade: ['pate'], nouille: ['pate'],
+  basmati: ['riz'], thai: ['riz'], arborio: ['riz'],
+  emmental: ['fromage'], gruyere: ['fromage'], comte: ['fromage'], mozzarella: ['fromage'], cheddar: ['fromage'],
+  parmesan: ['fromage'], raclette: ['fromage'], reblochon: ['fromage'], chevre: ['fromage'], feta: ['fromage'],
+  ricotta: ['fromage'],
+  steak: ['boeuf'], entrecote: ['boeuf'], bavette: ['boeuf'],
+  baguette: ['pain'],
+  cebette: ['oignon'],
+  poitrine: ['lardon'],
+  tournesol: ['huile'], colza: ['huile'],
+  cassonade: ['sucre'], vergeoise: ['sucre']
+};
+
 /** Le produit du stock correspond à l'ingrédient si tous les mots de l'ingrédient y figurent. */
 export function matches(ingredient: string, stockName: string): boolean {
   const ing = tokens(ingredient);
-  const st = new Set(tokens(stockName));
+  const st = new Set(tokens(stockName).flatMap((w) => [w, ...(KIND_OF[w] ?? [])]));
   return ing.length > 0 && ing.every((w) => st.has(w));
 }
 
