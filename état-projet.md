@@ -6,10 +6,10 @@ _Dernière mise à jour : 2026-10-14_
 
 Phase : **développement — squelette PWA en place**.
 
-- Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, workflow de déploiement GitHub Pages.
-- Écrans Stock et Recettes : vides (message « bientôt »).
+- Fait : projet Svelte 5 + Vite + TypeScript, PWA installable (manifest, service worker, icônes), navigation par onglets (Stock / Courses / Recettes), base locale IndexedDB (Dexie), **liste de courses fonctionnelle**, **écran Stock fonctionnel**, workflow de déploiement GitHub Pages.
+- Écran Recettes : vide (message « bientôt »).
 - **En ligne** : https://binckje.github.io/InMyFridge/ (déployé et testé sur iPhone, hors ligne OK).
-- Pas encore : synchro Google Drive, saisie du stock, scan, OCR, recettes.
+- Pas encore : synchro Google Drive, scan, OCR, recettes, configuration des emplacements.
 
 ## Objectif
 
@@ -64,6 +64,15 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - **Ajout auto sous seuil** : `syncLowStock()` ajoute les produits du stock sous leur seuil (étiquette « stock bas ») et retire ceux remontés. Actif dès que le stock sera saisi.
 - Suppressions logiques (`deleted`) + `updatedAt` sur chaque enregistrement → prêt pour la synchro.
 
+## 5 bis. Écran Stock (implémenté)
+
+- **Emplacements fixes (v1)** en puces défilantes : Tout · ⚠️ Bas · les 6 emplacements (compteur). Frigo et congélateur regroupés par sous-catégorie, « Tout » regroupé par emplacement.
+- **Champ unique chercher / ajouter** : filtre la liste en tapant ; ＋ ajoute dans l'emplacement affiché (deviné via le rayon si « Tout »). « lait 2 l », « riz 1 kg », « oeufs x6 ». Sans quantité → suivi par **niveau** (seuil par défaut « plus beaucoup »).
+- Produit déjà présent au même endroit : quantités additionnées (même unité), sinon remplacées.
+- **Boutons − / +** : pièce ±1, g/ml ±100, cl ±10, kg/l ±0,25 ; niveau : niveau précédent / suivant (couleur rouge/orange/vert).
+- **Tap sur le nom** → feuille : nom, emplacement, catégorie, mode Quantité (valeur + unité + seuil) ou Niveau (niveau + seuil), suppression annulable 4 s.
+- Toute modification appelle `syncLowStock()` → ajout / retrait automatique dans les courses (étiquette « bas » dans le stock).
+
 ## 6. Stockage et synchronisation
 
 - Données stockées sur chaque appareil (fonctionnement hors ligne).
@@ -117,10 +126,13 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 |---------|------|
 | `src/App.svelte` | Onglets du bas, routage par `#hash` |
 | `src/views/Courses.svelte` | Écran liste de courses |
-| `src/views/Stock.svelte`, `Recettes.svelte` | Écrans à venir |
+| `src/views/Stock.svelte` | Écran stock |
+| `src/views/Recettes.svelte` | Écran à venir |
 | `src/lib/types.ts` | Modèle de données (StockItem, ShoppingItem, Aisle) |
-| `src/lib/db.ts` | Base Dexie (tables `stock`, `shopping`, `memory`) + stockage persistant |
+| `src/lib/db.ts` | Base Dexie (tables `stock`, `shopping`, `memory`, schéma v2 : `locationId`) + stockage persistant |
 | `src/lib/shopping.ts` | Logique courses (ajout, édition, suggestions, lien stock → courses) |
+| `src/lib/stock.ts` | Logique stock (saisie rapide, −/+, édition, format) |
+| `src/lib/locations.ts` | Emplacements, sous-catégories, devinette |
 | `src/lib/aisles.ts` | Rayons par défaut + devinette du rayon |
 | `.github/workflows/deploy.yml` | Build + publication GitHub Pages sur push `main` |
 
@@ -128,9 +140,9 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 
 ## Prochaines étapes
 
-1. Écran Stock : saisie manuelle, emplacements, quantités / niveaux, seuils.
-2. Synchro Google Drive (adaptateur).
-3. Scan code-barres + Open Food Facts.
+1. Synchro Google Drive (adaptateur).
+2. Scan code-barres + Open Food Facts.
+3. Configuration des emplacements / catégories.
 
 ## Journal des décisions
 
@@ -147,3 +159,4 @@ Commandes : `npm install`, `npm run dev` (serveur local accessible depuis le té
 | 2026-10-14 | Squelette PWA créé. Liste de courses : saisie rapide, rayon deviné + mémorisé, suggestions, cocher, regroupement par rayon, ajout auto sous seuil. |
 | 2026-10-14 | `typescript@~6` (svelte-check ne supporte pas encore TS 7 seul). |
 | 2026-10-14 | Fusion sur `main`, GitHub Pages activé, PWA testée et fonctionnelle. |
+| 2026-10-14 | Écran Stock : emplacements figés v1, saisie rapide + feuille, boutons − / +. |

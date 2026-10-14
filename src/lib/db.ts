@@ -22,6 +22,17 @@ db.version(1).stores({
   memory: 'key, count, lastUsed'
 });
 
+db.version(2)
+  .stores({ stock: 'id, locationId, aisleId, updatedAt' })
+  .upgrade((tx) =>
+    tx
+      .table('stock')
+      .toCollection()
+      .modify((s: StockItem) => {
+        s.locationId ??= 'frigo';
+      })
+  );
+
 export const newId = () => crypto.randomUUID();
 
 /** Demande au navigateur de ne pas purger les données (important sur iOS). */
