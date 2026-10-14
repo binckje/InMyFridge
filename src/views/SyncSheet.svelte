@@ -16,6 +16,7 @@
     type Pending
   } from '../lib/drive';
   import { syncWith } from '../lib/sync';
+  import { downloadBackup, importBackup } from '../lib/backup';
 
   let { pending = null, onclose }: { pending?: Pending | null; onclose: () => void } = $props();
 
@@ -69,6 +70,21 @@
     refresh();
   }
 
+  /* ---------- Sauvegarde locale ---------- */
+  let backupMsg = $state('');
+  async function restore(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const n = await importBackup(await file.text());
+      backupMsg = n ? `Restauré · ${n} élément${n > 1 ? 's' : ''} repris` : 'Rien de nouveau dans ce fichier.';
+    } catch (err) {
+      backupMsg = err instanceof Error && err.message === 'Fichier non reconnu.' ? err.message : 'Fichier illisible.';
+    }
+  }
+
   const when = (t?: number) =>
     t ? new Date(t).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
 
@@ -115,6 +131,17 @@
       <button class="btn ghost" onclick={onclose}>Fermer</button>
     </div>
   {/if}
+
+  <h3>💾 Sauvegarde</h3>
+  <p class="hint">Copie de toutes les données dans un fichier, à garder au cas où. La restauration fusionne : rien n'est effacé.</p>
+  <div class="backup">
+    <button class="btn ghost" onclick={downloadBackup}>Télécharger</button>
+    <label class="btn ghost">Restaurer…<input type="file" accept="application/json,.json" onchange={restore} hidden /></label>
+  </div>
+  {#if backupMsg}<p class="msg">{backupMsg}</p>{/if}
+  {#if !isConfigured()}
+    <button class="btn ghost" onclick={onclose}>Fermer</button>
+  {/if}
 </div>
 
 <style>
@@ -142,5 +169,8 @@
     z-index: 50;
   }
   .actions { display: flex; justify-content: space-between; }
+  h3 { margin: 8px 0 0; font-size: 16px; }
+  .backup { display: flex; gap: 8px; }
+  .backup .btn { flex: 1; text-align: center; }
   .actions .btn.ghost:only-child { margin-left: auto; }
 </style>
