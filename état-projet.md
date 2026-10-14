@@ -60,14 +60,32 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 ## Questions ouvertes
 
-- [ ] Choix du framework front pour la PWA.
+- [ ] Choix du framework front pour la PWA → proposition ci-dessous, à valider.
 - [ ] Stockage local PWA (IndexedDB) et limites iOS (quota, purge des données Safari).
+- [ ] CORS Nextcloud : la PWA ne peut pas appeler le WebDAV Nextcloud depuis un autre domaine sans configuration. Options : (a) autoriser CORS côté Nextcloud (app/en-têtes serveur), (b) servir la PWA sur le même domaine que Nextcloud (reverse proxy), (c) petit proxy dédié.
 - [ ] Format de synchro Nextcloud (WebDAV + fichier JSON/SQLite ? gestion des conflits multi-appareils).
 - [ ] Source de données code-barres (ex. Open Food Facts).
 - [ ] Moteur OCR (local ou service en ligne).
 - [ ] Source(s) de recettes internet.
 - [ ] Gestion des dates de péremption ? (non demandé pour l'instant)
 - [ ] Multi-utilisateurs / foyer partagé ?
+
+## Proposition de stack technique (à valider)
+
+| Besoin | Proposition | Pourquoi |
+|--------|-------------|----------|
+| Framework UI | **Svelte 5 + Vite** (SPA statique) | Léger, rapide sur mobile, peu de code, build statique facile à héberger (y compris sur Nextcloud/NAS) |
+| PWA (installation, hors ligne) | **vite-plugin-pwa** (Workbox) | Manifest + service worker générés automatiquement |
+| Stockage local | **IndexedDB via Dexie.js** | Requêtes simples, versions de schéma, adapté à la synchro |
+| Synchro Nextcloud | **webdav** (client JS) + fichier JSON horodaté par appareil | Fusion par horodatage, pas de serveur à développer |
+| Scan code-barres | **BarcodeDetector** natif, repli **@zxing/browser** | iOS Safari n'a pas BarcodeDetector → ZXing nécessaire |
+| Infos produit | **Open Food Facts** (API gratuite) | Nom, catégorie, image depuis le code-barres |
+| OCR emballage | **Tesseract.js** (local, dans le navigateur) | Gratuit, hors ligne, sans service tiers |
+| Langage | **TypeScript** | Moins d'erreurs sur le modèle de données |
+
+Évolution : la même PWA fonctionne sur Android et Windows. Si une app native devient nécessaire plus tard : **Capacitor** (mobile) ou **Tauri** (desktop) peuvent emballer le même code.
+
+Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installation native), React Native (idem), React/Vue (viables mais plus lourds que Svelte pour ce projet).
 
 ## Journal des décisions
 
