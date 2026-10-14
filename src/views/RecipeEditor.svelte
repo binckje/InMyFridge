@@ -4,10 +4,15 @@
   import { deleteRecipe, formatIngredient, parseIngredient, saveRecipe } from '../lib/recipes';
   import type { Recipe } from '../lib/types';
 
-  /** onclose(id) : id de la recette enregistrée (pour la rouvrir), rien si annulé. */
+  /**
+   * recipe : recette à modifier, ou fiche importée sans id (nouvelle recette pré-remplie).
+   * onclose(id) : id de la recette enregistrée (pour la rouvrir), rien si annulé.
+   */
   let { recipe, onclose }: { recipe: Recipe | null; onclose: (id?: string) => void } = $props();
 
   const r = untrack(() => recipe);
+  const isNew = !r?.id;
+  const imported = !!r && isNew;
   let form = $state({
     name: r?.name ?? '',
     emoji: r?.emoji ?? '🍽️',
@@ -25,7 +30,7 @@
     e.preventDefault();
     if (!valid) return;
     const id = await saveRecipe({
-      id: r?.id,
+      id: r?.id || undefined,
       name: form.name.trim(),
       emoji: form.emoji.trim() || undefined,
       servings: Math.max(1, parseInt(form.servings) || 4),
@@ -51,8 +56,11 @@
 
 <button class="backdrop" aria-label="Fermer" onclick={() => onclose()} transition:fade={{ duration: 150 }}></button>
 <form class="sheet" onsubmit={save} transition:fly={{ y: 500, duration: 220 }}>
-  <h2>{r ? 'Modifier la recette' : 'Nouvelle recette'}</h2>
+  <h2>{isNew ? (imported ? 'Recette importée' : 'Nouvelle recette') : 'Modifier la recette'}</h2>
 
+  {#if imported}
+    <p class="imported">📄 Vérifie la fiche : ingrédients et étapes ont été repérés automatiquement. Corrige si besoin, puis enregistre.</p>
+  {/if}
   <input bind:value={form.name} placeholder="Nom de la recette" aria-label="Nom" />
 
   <div class="emojis">
@@ -88,7 +96,7 @@
   </label>
 
   <div class="actions">
-    {#if r}
+    {#if !isNew}
       <button type="button" class="btn danger" onclick={remove}>Supprimer</button>
     {:else}
       <button type="button" class="btn danger" onclick={() => onclose()}>Annuler</button>
@@ -137,4 +145,5 @@
   .emojis button.sel { background: var(--green-soft); outline: 2px solid var(--green); }
   .actions { display: flex; justify-content: space-between; }
   .btn:disabled { opacity: 0.4; }
+  .imported { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--green-soft); font-size: 14px; }
 </style>
