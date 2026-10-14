@@ -3,7 +3,8 @@
   import { fade } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
-  import { rank, tokens, type RecipeCheck } from '../lib/recipes';
+  import { rank, saveRecipe, tokens, type RecipeCheck } from '../lib/recipes';
+  import { fetchWebRecipe, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
   import RecipeEditor from './RecipeEditor.svelte';
@@ -38,6 +39,50 @@
   let openId = $state<string | null>(null);
   const opened = $derived(ranked.find((c) => c.recipe.id === openId)?.recipe ?? null);
   let editing = $state<Recipe | 'new' | null>(null);
+
+  /* ---------- Internet ---------- */
+  let web = $state<{ title: string; hits: WebHit[] } | null>(null);
+  let webBusy = $state(false);
+  let webError = $state('');
+  let preview = $state.raw<Recipe | null>(null);
+
+  async function runWeb(title: string, search: () => Promise<WebHit[]>) {
+    webBusy = true;
+    webError = '';
+    try {
+      web = { title, hits: await search() };
+    } catch {
+      webError = 'Recherche impossible : vérifie la connexion internet.';
+    } finally {
+      webBusy = false;
+    }
+  }
+  const searchOnline = () => runWeb(`« ${text.trim()} » sur internet`, () => searchWeb(text.trim()));
+  const ideas = () =>
+    runWeb('Idées avec ton stock', () => ideasFromStock(($stock ?? []).map((s) => s.name)));
+  $effect(() => {
+    void text;
+    web = null;
+  });
+
+  async function openWeb(h: WebHit) {
+    if (($recipes ?? []).some((r) => r.id === `web-${h.id}`)) return (openId = `web-${h.id}`);
+    webBusy = true;
+    try {
+      preview = await fetchWebRecipe(h.id);
+    } catch {
+      webError = 'Recette introuvable : vérifie la connexion internet.';
+    } finally {
+      webBusy = false;
+    }
+  }
+
+  async function savePreview() {
+    if (!preview) return;
+    const { id, createdAt, updatedAt, ...rest } = preview;
+    openId = await saveRecipe({ ...rest, id });
+    preview = null;
+  }
 
   const stars = (n = 0) => '★'.repeat(n) + '☆'.repeat(5 - n);
   const duration = (min?: number) =>
@@ -88,7 +133,7 @@
   {#each shown as c (c.recipe.id)}
     <li animate:flip={{ duration: 200 }}>
       <button class="card" onclick={() => (openId = c.recipe.id)}>
-        <span class="emoji">{c.recipe.emoji ?? '🍽️'}</span>
+        {#if c.recipe.image}<img src="{c.recipe.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">{c.recipe.emoji ?? '🍽️'}</span>{/if}
         <span class="body">
           <span class="name">{c.recipe.name}</span>
           <span class="meta">
@@ -106,6 +151,36 @@
     </li>
   {/each}
 </ul>
+
+<div class="web">
+  {#if text.trim()}
+    <button class="btn ghost" onclick={searchOnline} disabled={webBusy}>🌐 Chercher « {text.trim()} » sur internet</button>
+  {:else}
+    <button class="btn ghost" onclick={ideas} disabled={webBusy || !($stock ?? []).length}>🌐 Idées sur internet avec mon stock</button>
+  {/if}
+  {#if webBusy}<p class="hint">Recherche…</p>{/if}
+  {#if webError}<p class="err">{webError}</p>{/if}
+  {#if web}
+    <h2>{web.title} <span>{web.hits.length}</span></h2>
+    {#if !web.hits.length}
+      <p class="hint">Rien trouvé. Les recettes internet sont en anglais : essaie un ingrédient (« poulet ») ou un plat (« curry »).</p>
+    {/if}
+    <ul class="cards">
+      {#each web.hits as h (h.id)}
+        <li>
+          <button class="card" onclick={() => openWeb(h)}>
+            {#if h.image}<img src="{h.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">🌐</span>{/if}
+            <span class="body"><span class="name">{h.name}</span></span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</div>
+
+{#if preview}
+  <RecipeSheet recipe={preview} stock={$stock ?? []} onclose={() => (preview = null)} onsave={savePreview} />
+{/if}
 
 {#if opened}
   <RecipeSheet
@@ -192,6 +267,14 @@
     mask: radial-gradient(circle, transparent 9px, #000 10px);
     -webkit-mask: radial-gradient(circle, transparent 9px, #000 10px);
   }
+
+  .web { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .web h2 { margin: 10px 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .web h2 span { font-weight: 400; }
+  .web .btn:disabled { opacity: 0.5; }
+  .card img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; }
+  .hint { margin: 0; color: var(--muted); font-size: 14px; }
+  .err { margin: 0; color: var(--danger); font-size: 14px; }
 
   .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
   .big { font-size: 64px; }

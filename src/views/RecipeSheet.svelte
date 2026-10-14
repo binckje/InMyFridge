@@ -11,12 +11,14 @@
   } from '../lib/recipes';
   import type { Recipe, StockItem } from '../lib/types';
 
+  /** onsave : recette d'internet pas encore enregistrée (aperçu). */
   let {
     recipe,
     stock,
     onclose,
-    onedit
-  }: { recipe: Recipe; stock: StockItem[]; onclose: () => void; onedit: () => void } = $props();
+    onedit,
+    onsave
+  }: { recipe: Recipe; stock: StockItem[]; onclose: () => void; onedit?: () => void; onsave?: () => void } = $props();
 
   /** Nombre de personnes : les quantités suivent. */
   let servings = $state(0);
@@ -63,14 +65,22 @@
     <span class="emoji">{recipe.emoji ?? '🍽️'}</span>
     <div class="title">
       <h2>{recipe.name}</h2>
-      <div class="stars" role="group" aria-label="Note">
-        {#each [1, 2, 3, 4, 5] as n}
-          <button class:on={(recipe.rating ?? 0) >= n} onclick={() => rate(n)} aria-label="{n} étoile{n > 1 ? 's' : ''}">★</button>
-        {/each}
-      </div>
+      {#if !onsave}
+        <div class="stars" role="group" aria-label="Note">
+          {#each [1, 2, 3, 4, 5] as n}
+            <button class:on={(recipe.rating ?? 0) >= n} onclick={() => rate(n)} aria-label="{n} étoile{n > 1 ? 's' : ''}">★</button>
+          {/each}
+        </div>
+      {/if}
     </div>
     <button class="close" onclick={onclose} aria-label="Fermer">✕</button>
   </div>
+
+  {#if recipe.image}<img class="photo" src={recipe.image} alt="" loading="lazy" />{/if}
+  {#if onsave}
+    <button class="btn save" onclick={onsave}>💾 Enregistrer dans mes recettes</button>
+  {/if}
+  {#if recipe.source === 'web'}<p class="web">🌐 Recette TheMealDB : ingrédients traduits, étapes en anglais.</p>{/if}
 
   <div class="facts">
     {#if recipe.time}<span>⏱ {recipe.time} min</span>{/if}
@@ -117,9 +127,11 @@
     <p class="src"><a href={recipe.url} target="_blank" rel="noopener">Voir la recette d'origine ↗</a></p>
   {/if}
 
-  <div class="foot">
-    <button class="link" onclick={onedit}>✏️ Modifier la recette</button>
-  </div>
+  {#if onedit}
+    <div class="foot">
+      <button class="link" onclick={onedit}>✏️ Modifier la recette</button>
+    </div>
+  {/if}
 </div>
 
 {#if toast}
@@ -154,6 +166,9 @@
   .stars button.on { color: var(--amber); }
   .stars button:active { transform: scale(1.3); }
 
+  .photo { display: block; width: 100%; max-height: 200px; object-fit: cover; border-radius: var(--radius); margin-top: 12px; }
+  .save { width: 100%; margin-top: 12px; }
+  .web { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
   .facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 4px; color: var(--muted); font-size: 15px; }
   .servings { display: inline-flex; align-items: center; gap: 6px; }
   .servings button {
