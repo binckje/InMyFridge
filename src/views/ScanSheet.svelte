@@ -3,7 +3,7 @@
   import { fade, fly } from 'svelte/transition';
   import { lookup, rememberProduct, startScanner, validCode } from '../lib/barcode';
   import { AISLES } from '../lib/aisles';
-  import { LOCATIONS, guessLocation } from '../lib/locations';
+  import { LOCATIONS, guessLocation } from '../lib/locations.svelte';
   import { addItem } from '../lib/shopping';
   import { addStock } from '../lib/stock';
   import type { Product } from '../lib/types';

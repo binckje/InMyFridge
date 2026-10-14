@@ -1,6 +1,6 @@
 import { db, newId } from './db';
 import { aisleFor, syncLowStock } from './shopping';
-import { guessCategory, guessLocation, locationById } from './locations';
+import { guessCategory, guessLocation, locationById } from './locations.svelte';
 import { LEVELS, type Level, type ShoppingItem, type StockItem, type Unit } from './types';
 
 export const UNITS: Unit[] = ['pièce', 'g', 'kg', 'ml', 'cl', 'l'];

@@ -51,6 +51,11 @@ export interface Location {
   categories?: Category[];
 }
 
+/** Emplacement enregistré (configurable et synchronisé). */
+export interface StoredLocation extends Location, SyncFields {
+  order: number;
+}
+
 export interface Aisle {
   id: string;
   label: string;
