@@ -2,8 +2,14 @@
   import Courses from './views/Courses.svelte';
   import Stock from './views/Stock.svelte';
   import Recettes from './views/Recettes.svelte';
+  import SyncSheet from './views/SyncSheet.svelte';
+  import type { Pending } from './lib/drive';
   import { db } from './lib/db';
   import { liveQuery } from 'dexie';
+  import { untrack } from 'svelte';
+
+  let { pending = null }: { pending?: Pending | null } = $props();
+  let syncOpen = $state(untrack(() => !!pending));
 
   type Tab = 'stock' | 'courses' | 'recettes';
   const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -22,6 +28,7 @@
 </script>
 
 <main>
+  <button class="cloud" aria-label="Synchro" onclick={() => (syncOpen = true)}>☁️</button>
   {#if tab === 'courses'}
     <Courses />
   {:else if tab === 'stock'}
@@ -43,12 +50,25 @@
   {/each}
 </nav>
 
+{#if syncOpen}
+  <SyncSheet {pending} onclose={() => ((syncOpen = false), (pending = null))} />
+{/if}
+
 <style>
   main {
+    position: relative;
     max-width: 640px;
     margin: 0 auto;
     padding: calc(env(safe-area-inset-top) + 12px) 16px
       calc(var(--tabbar) + env(safe-area-inset-bottom) + 24px);
+  }
+  .cloud {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 14px);
+    right: 16px;
+    font-size: 24px;
+    padding: 4px;
+    z-index: 5;
   }
   nav {
     position: fixed;
