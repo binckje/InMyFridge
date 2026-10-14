@@ -1,7 +1,7 @@
 import { db, newId } from './db';
 import { aisleFor, syncLowStock } from './shopping';
-import { guessCategory, guessLocation, locationById } from './locations';
-import { LEVELS, type Level, type StockItem, type Unit } from './types';
+import { guessCategory, guessLocation, locationById } from './locations.svelte';
+import { LEVELS, type Level, type ShoppingItem, type StockItem, type Unit } from './types';
 
 export const UNITS: Unit[] = ['pièce', 'g', 'kg', 'ml', 'cl', 'l'];
 
@@ -36,7 +36,8 @@ export function parseStock(input: string): { name: string; qty?: number; unit?: 
 export async function addStock(
   input: string,
   locationId?: string,
-  kind: QtyKind = detectKind(input)
+  kind: QtyKind = detectKind(input),
+  aisle?: string
 ): Promise<StockItem | undefined> {
   const parsed = parseStock(input.trim());
   const name = parsed.name;
@@ -44,7 +45,7 @@ export async function addStock(
   const qty = unit ? (parsed.qty ?? 1) : undefined;
   const clean = name.trim();
   if (!clean) return;
-  const aisleId = await aisleFor(clean);
+  const aisleId = aisle ?? (await aisleFor(clean));
   const loc = locationId ?? guessLocation(aisleId);
   const existing = (await db.stock.toArray()).find(
     (s) => !s.deleted && s.locationId === loc && keyOf(s.name) === keyOf(clean)
@@ -93,3 +94,62 @@ export function adjust(item: StockItem, dir: 1 | -1) {
 
 export const formatQty = (s: StockItem): string =>
   s.level ?? (s.qty == null ? '' : `${String(s.qty).replace('.', ',')}${s.unit && s.unit !== 'pièce' ? ' ' + s.unit : ''}`);
+
+/* ---------- Retour de courses ---------- */
+
+const DIM: Record<Unit, [string, number]> = {
+  g: ['m', 1], kg: ['m', 1000], ml: ['v', 1], cl: ['v', 10], l: ['v', 1000], pièce: ['n', 1]
+};
+
+/** Convertit une quantité d'une unité à une autre (g ↔ kg, ml ↔ cl ↔ l). Incompatible → undefined. */
+export function convert(qty: number, from: Unit, to: Unit): number | undefined {
+  const [df, ff] = DIM[from];
+  const [dt, ft] = DIM[to];
+  return df === dt ? Math.round(((qty * ff) / ft) * 1000) / 1000 : undefined;
+}
+
+export interface RestockLine {
+  shoppingId: string;
+  name: string;
+  /** Produit du stock à réapprovisionner (sinon : nouveau produit). */
+  stock?: StockItem;
+  /** Quantité achetée, dans l'unité du produit du stock (ou texte libre pour un nouveau produit). */
+  qty: string;
+  include: boolean;
+}
+
+/** Prépare le rangement des articles achetés : produit du stock correspondant + quantité déduite. */
+export async function planRestock(items: ShoppingItem[]): Promise<RestockLine[]> {
+  const stock = (await db.stock.toArray()).filter((s) => !s.deleted);
+  return items.map((i) => {
+    const s =
+      stock.find((s) => s.id === i.stockItemId) ?? stock.find((s) => keyOf(s.name) === keyOf(i.name));
+    const bought: { qty?: number; unit?: Unit } = i.qty ? parseStock(`x ${i.qty}`) : {};
+    let qty = '';
+    if (s && !s.level && bought.qty != null) {
+      const q = convert(bought.qty, bought.unit ?? 'pièce', s.unit ?? 'pièce');
+      if (q != null) qty = String(q).replace('.', ',');
+    } else if (!s) qty = i.qty ?? '';
+    return { shoppingId: i.id, name: i.name, stock: s, qty, include: !!s };
+  });
+}
+
+/** Range les achats : niveau → « suffisamment », quantité → ajoutée, nouveau produit → créé. */
+export async function applyRestock(lines: RestockLine[]): Promise<number> {
+  let n = 0;
+  for (const l of lines) {
+    if (!l.include) continue;
+    const s = l.stock;
+    if (!s) {
+      await addStock(`${l.name} ${l.qty}`.trim());
+    } else if (s.level) {
+      await updateStock(s.id, { level: 'suffisamment' });
+    } else {
+      const q = parseFloat(l.qty.replace(',', '.'));
+      if (!Number.isFinite(q) || q <= 0) continue;
+      await updateStock(s.id, { qty: Math.round(((s.qty ?? 0) + q) * 1000) / 1000 });
+    }
+    n++;
+  }
+  return n;
+}

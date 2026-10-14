@@ -3,10 +3,16 @@
   import { fly, fade, slide } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
-  import { LOCATIONS, categoryOf, locationById } from '../lib/locations';
+  import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
   import { isLow } from '../lib/shopping';
   import { UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatQty, parseStock, updateStock } from '../lib/stock';
   import { LEVELS, type Level, type StockItem, type Unit } from '../lib/types';
+  import ScanSheet from './ScanSheet.svelte';
+  import LocationsSheet from './LocationsSheet.svelte';
+
+  let configuring = $state(false);
+
+  let scanning = $state(false);
 
   const items = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
   const all = $derived(($items ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, 'fr')));
@@ -30,7 +36,7 @@
   /** Regroupement : par sous-catégorie dans un emplacement, sinon par emplacement. */
   const groups = $derived.by(() => {
     const loc = LOCATIONS.find((l) => l.id === filter);
-    if (loc?.categories) {
+    if (loc?.categories?.length) {
       return loc.categories
         .map((c) => ({
           key: c.id,
@@ -120,7 +126,7 @@
     await updateStock(editing.id, {
       name: form.name.trim(),
       locationId: form.locationId,
-      categoryId: formLoc.categories ? form.categoryId : undefined,
+      categoryId: formLoc.categories?.length ? form.categoryId : undefined,
       qty: qtyMode ? (num(form.qty) ?? 0) : undefined,
       unit: qtyMode ? form.unit : undefined,
       level: qtyMode ? undefined : form.level,
@@ -180,6 +186,7 @@
       {l.emoji} {l.label}{#if count(l.id)}<span class="n">{count(l.id)}</span>{/if}
     </button>
   {/each}
+  <button class="chip gear" onclick={() => (configuring = true)} aria-label="Configurer les emplacements">⚙️</button>
 </div>
 
 <form class="add" onsubmit={submit}>
@@ -190,7 +197,11 @@
     autocomplete="off"
     aria-label="Chercher ou ajouter un produit"
   />
-  <button class="btn" type="submit" aria-label="Ajouter" disabled={!text.trim()}>＋</button>
+  {#if text.trim()}
+    <button class="btn" type="submit" aria-label="Ajouter">＋</button>
+  {:else}
+    <button class="btn ghost" type="button" aria-label="Scanner un code-barres" onclick={() => (scanning = true)}>📷</button>
+  {/if}
 </form>
 
 {#if text.trim()}
@@ -247,6 +258,14 @@
   </div>
 {/if}
 
+{#if configuring}
+  <LocationsSheet onclose={() => (configuring = false)} />
+{/if}
+
+{#if scanning}
+  <ScanSheet mode="stock" locationId={target?.id} onclose={() => (scanning = false)} />
+{/if}
+
 {#if editing}
   <button class="backdrop" aria-label="Fermer" onclick={() => (editing = null)} transition:fade={{ duration: 150 }}></button>
   <form class="sheet" onsubmit={save} transition:fly={{ y: 400, duration: 200 }}>
@@ -263,7 +282,7 @@
       </div>
     </div>
 
-    {#if formLoc.categories}
+    {#if formLoc.categories?.length}
       <div class="field">
         <span class="lbl">Catégorie</span>
         <div class="chips">
