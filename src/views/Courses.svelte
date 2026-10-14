@@ -1,0 +1,360 @@
+<script lang="ts">
+  import { liveQuery } from 'dexie';
+  import { fly, fade, slide } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
+  import { db, type Memory } from '../lib/db';
+  import { AISLES, aisleById } from '../lib/aisles';
+  import {
+    addItem,
+    clearChecked,
+    deleteItem,
+    suggestions,
+    syncLowStock,
+    toggleItem,
+    updateItem
+  } from '../lib/shopping';
+  import type { ShoppingItem } from '../lib/types';
+
+  const items = liveQuery(() => db.shopping.filter((i) => !i.deleted).toArray());
+
+  const todo = $derived(($items ?? []).filter((i) => !i.checked));
+  const done = $derived(($items ?? []).filter((i) => i.checked));
+  const total = $derived(todo.length + done.length);
+  const groups = $derived(
+    AISLES.map((a) => ({
+      aisle: a,
+      items: todo.filter((i) => aisleById(i.aisleId).id === a.id).sort((x, y) => x.createdAt - y.createdAt)
+    })).filter((g) => g.items.length)
+  );
+
+  // Ajout automatique des produits sous le seuil à l'ouverture de l'écran.
+  syncLowStock();
+
+  /* ---------- Saisie rapide ---------- */
+  let text = $state('');
+  let focused = $state(false);
+  let sugg = $state<Memory[]>([]);
+  $effect(() => {
+    const t = text;
+    void $items; // rafraîchit quand la liste change
+    suggestions(t).then((s) => (sugg = s));
+  });
+
+  /** « 2 l lait », « lait 2l », « 3 pommes », « lait x2 » → { qty, name } */
+  function parse(input: string): { name: string; qty: string } {
+    const unit = '(?:g|kg|ml|cl|l|x|pcs?|pièces?|paquets?|boîtes?|bouteilles?)';
+    const before = input.match(new RegExp(`^(\\d+(?:[.,]\\d+)?\\s*${unit}?)\\s+(.+)$`, 'i'));
+    if (before) return { qty: before[1], name: before[2] };
+    const after = input.match(new RegExp(`^(.+?)\\s+((?:x\\s*)?\\d+(?:[.,]\\d+)?\\s*${unit}?)$`, 'i'));
+    if (after) return { name: after[1], qty: after[2] };
+    return { name: input, qty: '' };
+  }
+
+  async function submit(e: SubmitEvent) {
+    e.preventDefault();
+    const { name, qty } = parse(text.trim());
+    if (!name) return;
+    await addItem(name, qty);
+    buzz();
+    text = '';
+  }
+
+  async function pick(m: Memory) {
+    await addItem(m.name, '', m.aisleId);
+    buzz();
+    text = '';
+  }
+
+  /* ---------- Cocher ---------- */
+  let celebrate = $state(false);
+  async function check(item: ShoppingItem) {
+    buzz();
+    const last = !item.checked && todo.length === 1;
+    await toggleItem(item);
+    if (last) {
+      celebrate = true;
+      setTimeout(() => (celebrate = false), 2500);
+    }
+  }
+
+  /* ---------- Édition ---------- */
+  let editing = $state<ShoppingItem | null>(null);
+  let form = $state({ name: '', qty: '', aisleId: '' });
+  function edit(item: ShoppingItem) {
+    editing = item;
+    form = { name: item.name, qty: item.qty ?? '', aisleId: aisleById(item.aisleId).id };
+  }
+  async function save(e: SubmitEvent) {
+    e.preventDefault();
+    if (!editing || !form.name.trim()) return;
+    await updateItem(editing.id, {
+      name: form.name.trim(),
+      qty: form.qty.trim() || undefined,
+      aisleId: form.aisleId
+    });
+    editing = null;
+  }
+
+  /* ---------- Suppression avec annulation ---------- */
+  let undo = $state<{ id: string; name: string } | null>(null);
+  let undoTimer: ReturnType<typeof setTimeout>;
+  async function remove(item: ShoppingItem) {
+    editing = null;
+    await deleteItem(item.id);
+    undo = { id: item.id, name: item.name };
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => (undo = null), 4000);
+  }
+  async function restore() {
+    if (undo) await updateItem(undo.id, { deleted: false });
+    undo = null;
+  }
+
+  const buzz = () => navigator.vibrate?.(12);
+</script>
+
+<header>
+  <h1>Courses</h1>
+  <p class="sub">
+    {#if total === 0}
+      Rien à acheter pour l'instant.
+    {:else if todo.length === 0}
+      Tout est dans le panier 🎉
+    {:else}
+      <strong>{todo.length}</strong> à prendre{#if done.length}{" · "}{done.length} dans le panier{/if}
+    {/if}
+  </p>
+  {#if total > 0}
+    <div class="progress"><div style="width: {(done.length / total) * 100}%"></div></div>
+  {/if}
+</header>
+
+<form class="add" onsubmit={submit}>
+  <input
+    bind:value={text}
+    onfocus={() => (focused = true)}
+    onblur={() => setTimeout(() => (focused = false), 150)}
+    placeholder="Ajouter… ex. « 2 l lait »"
+    enterkeyhint="done"
+    autocomplete="off"
+    aria-label="Ajouter un article"
+  />
+  <button class="btn" type="submit" aria-label="Ajouter" disabled={!text.trim()}>＋</button>
+</form>
+
+{#if (focused || text) && sugg.length}
+  <div class="chips" transition:slide={{ duration: 150 }}>
+    {#each sugg as m (m.key)}
+      <button class="chip" onclick={() => pick(m)}>{aisleById(m.aisleId).emoji} {m.name}</button>
+    {/each}
+  </div>
+{/if}
+
+{#if total === 0}
+  <div class="empty" in:fade>
+    <div class="big">🛒</div>
+    <p>Ta liste est vide.<br />Ajoute un article ci-dessus — le rayon est deviné tout seul.</p>
+  </div>
+{/if}
+
+{#each groups as g (g.aisle.id)}
+  <section transition:slide={{ duration: 200 }}>
+    <h2>{g.aisle.emoji} {g.aisle.label} <span>{g.items.length}</span></h2>
+    <ul>
+      {#each g.items as item (item.id)}
+        <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }}>
+          <button class="check" onclick={() => check(item)} aria-label="Cocher {item.name}"></button>
+          <button class="label" onclick={() => edit(item)}>
+            <span class="name">{item.name}</span>
+            {#if item.qty}<span class="qty">{item.qty}</span>{/if}
+            {#if item.stockItemId}<span class="tag">stock bas</span>{/if}
+          </button>
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/each}
+
+{#if done.length}
+  <section class="basket" transition:slide={{ duration: 200 }}>
+    <h2>✅ Dans le panier <span>{done.length}</span></h2>
+    <ul>
+      {#each done as item (item.id)}
+        <li animate:flip={{ duration: 200 }}>
+          <button class="check on" onclick={() => check(item)} aria-label="Décocher {item.name}"
+            >✓</button
+          >
+          <button class="label" onclick={() => edit(item)}>
+            <span class="name">{item.name}</span>
+            {#if item.qty}<span class="qty">{item.qty}</span>{/if}
+          </button>
+        </li>
+      {/each}
+    </ul>
+    <button class="btn ghost clear" onclick={clearChecked}>Vider le panier ({done.length})</button>
+  </section>
+{/if}
+
+{#if celebrate}
+  <div class="party" transition:fade>
+    <div class="party-emoji">🎉</div>
+    <p>Courses terminées !</p>
+  </div>
+{/if}
+
+{#if undo}
+  <div class="toast" transition:fly={{ y: 40 }}>
+    « {undo.name} » supprimé <button onclick={restore}>Annuler</button>
+  </div>
+{/if}
+
+{#if editing}
+  <button class="backdrop" aria-label="Fermer" onclick={() => (editing = null)} transition:fade={{ duration: 150 }}></button>
+  <form class="sheet" onsubmit={save} transition:fly={{ y: 300, duration: 200 }}>
+    <input bind:value={form.name} placeholder="Article" aria-label="Nom" />
+    <input bind:value={form.qty} placeholder="Quantité (optionnel)" aria-label="Quantité" />
+    <div class="aisles">
+      {#each AISLES as a (a.id)}
+        <button
+          type="button"
+          class="chip"
+          class:sel={form.aisleId === a.id}
+          onclick={() => (form.aisleId = a.id)}>{a.emoji} {a.label}</button
+        >
+      {/each}
+    </div>
+    <div class="actions">
+      <button type="button" class="btn danger" onclick={() => editing && remove(editing)}>Supprimer</button>
+      <button type="submit" class="btn">Enregistrer</button>
+    </div>
+  </form>
+{/if}
+
+<style>
+  h1 { margin: 8px 0 0; font-size: 32px; }
+  .sub { margin: 2px 0 10px; color: var(--muted); }
+  .progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .progress div { height: 100%; background: var(--green); transition: width 0.4s ease; }
+
+  .add {
+    position: sticky;
+    top: env(safe-area-inset-top);
+    z-index: 5;
+    display: flex;
+    gap: 8px;
+    padding: 12px 0 8px;
+    background: var(--bg);
+  }
+  .add .btn { width: 48px; flex: none; padding: 0; font-size: 22px; }
+  .add .btn:disabled { opacity: 0.4; }
+
+  .chips, .aisles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    font-size: 15px;
+  }
+  .chip.sel { background: var(--green); border-color: var(--green); color: #fff; }
+
+  section { margin-top: 18px; }
+  h2 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  h2 span { font-weight: 400; }
+  ul { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); background: var(--card); overflow: hidden; }
+  li { display: flex; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: 0; }
+
+  .check {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin: 0 12px 0 14px;
+    border-radius: 50%;
+    border: 2px solid var(--green);
+    color: #fff;
+    font-weight: 700;
+    transition: transform 0.15s, background 0.15s;
+  }
+  .check:active { transform: scale(0.85); }
+  .check.on { background: var(--green); }
+  .label {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 14px 14px 14px 0;
+    text-align: left;
+  }
+  .qty { color: var(--muted); font-size: 15px; }
+  .tag {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--amber) 20%, transparent);
+    color: var(--amber);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .basket .name { text-decoration: line-through; color: var(--muted); }
+  .clear { display: block; margin: 12px auto 0; }
+
+  .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
+  .big { font-size: 64px; }
+
+  .party {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    pointer-events: none;
+    z-index: 30;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .party-emoji { font-size: 96px; animation: pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1); }
+  @keyframes pop { from { transform: scale(0) rotate(-30deg); } to { transform: scale(1) rotate(0); } }
+
+  .toast {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px);
+    max-width: 608px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #292524;
+    color: #fff;
+    z-index: 20;
+  }
+  .toast button { color: #86efac; font-weight: 700; }
+
+  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 40; }
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 16px calc(env(safe-area-inset-bottom) + 16px);
+    border-radius: 20px 20px 0 0;
+    background: var(--bg);
+    z-index: 50;
+  }
+  .actions { display: flex; justify-content: space-between; }
+</style>
