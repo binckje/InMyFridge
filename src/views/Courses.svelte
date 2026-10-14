@@ -14,6 +14,9 @@
   } from '../lib/shopping';
   import type { ShoppingItem } from '../lib/types';
   import RestockSheet from './RestockSheet.svelte';
+  import ScanSheet from './ScanSheet.svelte';
+
+  let scanning = $state(false);
 
   const items = liveQuery(() => db.shopping.filter((i) => !i.deleted).toArray());
 
@@ -149,7 +152,11 @@
     autocomplete="off"
     aria-label="Ajouter un article"
   />
-  <button class="btn" type="submit" aria-label="Ajouter" disabled={!text.trim()}>＋</button>
+  {#if text.trim()}
+    <button class="btn" type="submit" aria-label="Ajouter">＋</button>
+  {:else}
+    <button class="btn ghost" type="button" aria-label="Scanner un code-barres" onclick={() => (scanning = true)}>📷</button>
+  {/if}
 </form>
 
 {#if (focused || text) && sugg.length}
@@ -216,6 +223,10 @@
   <div class="toast" transition:fly={{ y: 40 }}>
     « {undo.name} » supprimé <button onclick={restore}>Annuler</button>
   </div>
+{/if}
+
+{#if scanning}
+  <ScanSheet mode="courses" onclose={() => (scanning = false)} />
 {/if}
 
 {#if restock}

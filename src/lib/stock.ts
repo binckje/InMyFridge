@@ -36,7 +36,8 @@ export function parseStock(input: string): { name: string; qty?: number; unit?: 
 export async function addStock(
   input: string,
   locationId?: string,
-  kind: QtyKind = detectKind(input)
+  kind: QtyKind = detectKind(input),
+  aisle?: string
 ): Promise<StockItem | undefined> {
   const parsed = parseStock(input.trim());
   const name = parsed.name;
@@ -44,7 +45,7 @@ export async function addStock(
   const qty = unit ? (parsed.qty ?? 1) : undefined;
   const clean = name.trim();
   if (!clean) return;
-  const aisleId = await aisleFor(clean);
+  const aisleId = aisle ?? (await aisleFor(clean));
   const loc = locationId ?? guessLocation(aisleId);
   const existing = (await db.stock.toArray()).find(
     (s) => !s.deleted && s.locationId === loc && keyOf(s.name) === keyOf(clean)

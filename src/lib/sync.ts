@@ -1,5 +1,5 @@
 import { db, type Memory } from './db';
-import type { Recipe, ShoppingItem, StockItem } from './types';
+import type { Product, Recipe, ShoppingItem, StockItem } from './types';
 
 /** Contenu du fichier de synchro partagé entre tous les appareils du foyer. */
 export interface Snapshot {
@@ -10,6 +10,7 @@ export interface Snapshot {
   memory: Memory[];
   /** Absent des fichiers créés avant l'écran Recettes. */
   recipes?: Recipe[];
+  products?: Product[];
 }
 
 /** Fournisseur de stockage distant (Google Drive aujourd'hui, Nextcloud / NAS plus tard). */
@@ -44,23 +45,26 @@ export interface SyncResult {
  */
 export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
   const remote = await provider.read();
-  const [stock, shopping, memory, recipes] = await Promise.all([
+  const [stock, shopping, memory, recipes, products] = await Promise.all([
     db.stock.toArray(),
     db.shopping.toArray(),
     db.memory.toArray(),
-    db.recipes.toArray()
+    db.recipes.toArray(),
+    db.products.toArray()
   ]);
 
   const s = mergeBy(stock, remote?.stock ?? [], (i) => i.id, (i) => i.updatedAt);
   const sh = mergeBy(shopping, remote?.shopping ?? [], (i) => i.id, (i) => i.updatedAt);
   const m = mergeBy(memory, remote?.memory ?? [], (i) => i.key, (i) => i.lastUsed);
   const r = mergeBy(recipes, remote?.recipes ?? [], (i) => i.id, (i) => i.updatedAt);
+  const p = mergeBy(products, remote?.products ?? [], (i) => i.code, (i) => i.updatedAt);
 
-  await db.transaction('rw', [db.stock, db.shopping, db.memory, db.recipes], async () => {
+  await db.transaction('rw', [db.stock, db.shopping, db.memory, db.recipes, db.products], async () => {
     await db.stock.bulkPut(s.changed);
     await db.shopping.bulkPut(sh.changed);
     await db.memory.bulkPut(m.changed);
     await db.recipes.bulkPut(r.changed);
+    await db.products.bulkPut(p.changed);
   });
 
   await provider.write({
@@ -69,8 +73,9 @@ export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
     stock: s.all,
     shopping: sh.all,
     memory: m.all,
-    recipes: r.all
+    recipes: r.all,
+    products: p.all
   });
 
-  return { received: s.changed.length + sh.changed.length + m.changed.length + r.changed.length };
+  return { received: s.changed.length + sh.changed.length + m.changed.length + r.changed.length + p.changed.length };
 }

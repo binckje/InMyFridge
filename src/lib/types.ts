@@ -83,3 +83,17 @@ export interface Recipe extends SyncFields {
   image?: string;
   createdAt: number;
 }
+
+/** Produit identifié par code-barres (Open Food Facts, corrigé par l'utilisateur). */
+export interface Product {
+  code: string;
+  name: string;
+  brand?: string;
+  /** Contenance d'un exemplaire (« 500 g »). */
+  qty?: number;
+  unit?: Unit;
+  aisleId: string;
+  locationId?: string;
+  image?: string;
+  updatedAt: number;
+}
