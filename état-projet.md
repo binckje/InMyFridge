@@ -247,7 +247,6 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-14 | Stock : choix du type de quantité à la saisie (puces). |
 | 2026-10-14 | Synchro Drive : manuelle (bouton), fichier unique partagé, dernière modif gagne, OAuth par redirection. |
 | 2026-10-14 | Tests automatiques (vitest + fake-indexeddb), lancés avant chaque déploiement. |
-| 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
 | 2026-10-14 | Recettes : 30 recettes de base à identifiants fixes, comparaison au stock avec conversions d'unités, « J'ai cuisiné ça » déduit le stock. |
 | 2026-10-14 | Vider le panier → ranger les achats dans le stock (quantités converties). |
 | 2026-10-14 | Code-barres : BarcodeDetector + repli ZXing ; Open Food Facts ; produits mémorisés et synchronisés. |
@@ -257,3 +256,4 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-14 | Sauvegarde JSON locale + synchro auto silencieuse (si connexion Google < 1 h). |
 | 2026-10-15 | Corrections : synchro sans écrasement (contrôle de version Drive), rangement relu en base, mesures TheMealDB (fractions, parenthèses, unités). |
 | 2026-10-15 | Import de recettes (pdf via pdf.js, docx via fflate, rtf, txt, json, photo) en fiche normalisée vérifiée avant enregistrement ; export PDF (jsPDF), Word, texte, Markdown, JSON. |
+| 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
