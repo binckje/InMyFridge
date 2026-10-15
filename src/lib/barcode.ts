@@ -16,24 +16,67 @@ export function validCode(code: string): boolean {
 }
 
 interface Detector {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
 }
+
+const Native = () =>
+  (globalThis as unknown as { BarcodeDetector?: new (o: object) => Detector }).BarcodeDetector;
+
+async function zxingReader() {
+  const { BrowserMultiFormatReader } = await import('@zxing/browser');
+  const { BarcodeFormat, DecodeHintType } = await import('@zxing/library');
+  const hints = new Map<number, unknown>([
+    [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]],
+    // Cherche plus longtemps : codes petits ou flous.
+    [DecodeHintType.TRY_HARDER, true]
+  ]);
+  return new BrowserMultiFormatReader(hints as Map<never, never>, { delayBetweenScanAttempts: 150 });
+}
+
+/** Réglages offerts par la caméra (selon le téléphone). */
+export interface Scanner {
+  stop: () => void;
+  zoom?: { min: number; max: number; step: number; value: number };
+  setZoom: (z: number) => void;
+  torch: boolean;
+  setTorch: (on: boolean) => void;
+}
+
+type Caps = MediaTrackCapabilities & { zoom?: { min: number; max: number; step?: number }; torch?: boolean };
 
 /**
  * Lit les codes-barres dans le flux de la caméra arrière.
  * BarcodeDetector natif quand il existe (Android, Chrome), sinon ZXing (iPhone).
- * Retourne une fonction d'arrêt.
+ * Haute résolution + zoom ×2 par défaut : un petit code-barres reste net en tenant
+ * le téléphone plus loin (la mise au point de près échoue sur beaucoup d'appareils).
  */
-export async function startScanner(video: HTMLVideoElement, onCode: (code: string) => void): Promise<() => void> {
-  const Native = (globalThis as unknown as { BarcodeDetector?: new (o: object) => Detector }).BarcodeDetector;
-  if (Native) {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 } },
-      audio: false
-    });
+export async function startScanner(video: HTMLVideoElement, onCode: (code: string) => void): Promise<Scanner> {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: 'environment',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
+    },
+    audio: false
+  });
+  const track = stream.getVideoTracks()[0];
+  const caps = (track.getCapabilities?.() ?? {}) as Caps;
+  const apply = (c: object) => track.applyConstraints({ advanced: [c as MediaTrackConstraintSet] }).catch(() => {});
+
+  let zoom: Scanner['zoom'];
+  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+    const value = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
+    zoom = { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1, value };
+    await apply({ zoom: value });
+  }
+
+  let stopDecode: () => void;
+  const NativeDetector = Native();
+  if (NativeDetector) {
     video.srcObject = stream;
     await video.play();
-    const detector = new Native({ formats: FORMATS });
+    const detector = new NativeDetector({ formats: FORMATS });
     let running = true;
     const loop = async () => {
       if (!running) return;
@@ -47,26 +90,52 @@ export async function startScanner(video: HTMLVideoElement, onCode: (code: strin
       setTimeout(loop, 150);
     };
     loop();
-    return () => {
-      running = false;
-      stream.getTracks().forEach((t) => t.stop());
-    };
-  }
-  const { BrowserMultiFormatReader } = await import('@zxing/browser');
-  const { BarcodeFormat, DecodeHintType } = await import('@zxing/library');
-  const hints = new Map([
-    [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]]
-  ]);
-  const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 });
-  const controls = await reader.decodeFromConstraints(
-    { video: { facingMode: 'environment' }, audio: false },
-    video,
-    (result) => {
+    stopDecode = () => (running = false);
+  } else {
+    const reader = await zxingReader();
+    const controls = await reader.decodeFromStream(stream, video, (result) => {
       const code = result?.getText();
       if (code && validCode(code)) onCode(code);
+    });
+    stopDecode = () => controls.stop();
+  }
+
+  return {
+    stop: () => {
+      stopDecode();
+      stream.getTracks().forEach((t) => t.stop());
+    },
+    zoom,
+    setZoom: (z) => apply({ zoom: z }),
+    torch: !!caps.torch,
+    setTorch: (on) => apply({ torch: on })
+  };
+}
+
+/**
+ * Code-barres lu sur une photo (appareil photo natif : pleine résolution et vraie mise au point,
+ * bien plus fiable pour les petits codes). null si aucun code valide.
+ */
+export async function decodePhoto(file: Blob): Promise<string | null> {
+  const bitmap = await createImageBitmap(file);
+  // Réduit les très grandes photos (12 Mpx) : assez de détail, décodage rapide.
+  const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const NativeDetector = Native();
+  try {
+    if (NativeDetector) {
+      const found = await new NativeDetector({ formats: FORMATS }).detect(canvas);
+      return found.map((f) => f.rawValue).find(validCode) ?? null;
     }
-  );
-  return () => controls.stop();
+    const code = (await zxingReader()).decodeFromCanvas(canvas).getText();
+    return validCode(code) ? code : null;
+  } catch {
+    return null;
+  }
 }
 
 /* ---------- Fiche produit ---------- */

@@ -10,7 +10,8 @@
     suggestions,
     syncLowStock,
     toggleItem,
-    updateItem
+    updateItem,
+    parseShopping
   } from '../lib/shopping';
   import type { ShoppingItem } from '../lib/types';
   import RestockSheet from './RestockSheet.svelte';
@@ -43,19 +44,10 @@
     suggestions(t).then((s) => (sugg = s));
   });
 
-  /** « 2 l lait », « lait 2l », « 3 pommes », « lait x2 » → { qty, name } */
-  function parse(input: string): { name: string; qty: string } {
-    const unit = '(?:g|kg|ml|cl|l|x|pcs?|pièces?|paquets?|boîtes?|bouteilles?)';
-    const before = input.match(new RegExp(`^(\\d+(?:[.,]\\d+)?\\s*${unit}?)\\s+(.+)$`, 'i'));
-    if (before) return { qty: before[1], name: before[2] };
-    const after = input.match(new RegExp(`^(.+?)\\s+((?:x\\s*)?\\d+(?:[.,]\\d+)?\\s*${unit}?)$`, 'i'));
-    if (after) return { name: after[1], qty: after[2] };
-    return { name: input, qty: '' };
-  }
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
-    const { name, qty } = parse(text.trim());
+    const { name, qty } = parseShopping(text.trim());
     if (!name) return;
     await addItem(name, qty);
     buzz();

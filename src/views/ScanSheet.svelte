@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
-  import { lookup, rememberProduct, startScanner, validCode } from '../lib/barcode';
+  import { decodePhoto, lookup, rememberProduct, startScanner, validCode, type Scanner } from '../lib/barcode';
   import { readPhoto, suggest } from '../lib/ocr';
   import { AISLES, guessAisle } from '../lib/aisles';
   import { LOCATIONS, guessLocation } from '../lib/locations.svelte';
@@ -18,6 +18,23 @@
   type Step = 'scan' | 'loading' | 'ocr' | 'product';
   let step = $state<Step>('scan');
   let video = $state<HTMLVideoElement>();
+  /** Zoom et lampe, quand le téléphone les propose. */
+  let scanner = $state<Scanner | null>(null);
+  let zoom = $state(1);
+  let torch = $state(false);
+  let photoError = $state('');
+
+  /** Photo nette du code-barres (appareil photo natif) : fiable pour les petits codes. */
+  async function barcodePhoto(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    photoError = '';
+    const c = await decodePhoto(file);
+    if (c) found(c);
+    else photoError = 'Code-barres illisible sur la photo. Recadre plus près, bien net, ou tape le code.';
+  }
   let cameraError = $state('');
   let manual = $state('');
   let added = $state('');
@@ -29,11 +46,15 @@
   /** Caméra allumée seulement à l'étape « scan » ; éteinte dès qu'on la quitte, même pendant son démarrage. */
   $effect(() => {
     if (step !== 'scan' || !video) return;
-    let stop: (() => void) | undefined;
     let left = false;
     cameraError = '';
     startScanner(video, found)
-      .then((s) => (left ? s() : (stop = s)))
+      .then((s) => {
+        if (left) return s.stop();
+        scanner = s;
+        zoom = s.zoom?.value ?? 1;
+        torch = false;
+      })
       .catch((e) => {
         const name = (e as Error).name;
         cameraError =
@@ -45,7 +66,8 @@
       });
     return () => {
       left = true;
-      stop?.();
+      scanner?.stop();
+      scanner = null;
     };
   });
 
@@ -158,9 +180,32 @@
       <!-- svelte-ignore a11y_media_has_caption -->
       <video bind:this={video} playsinline muted></video>
       <div class="aim"></div>
+      {#if scanner?.torch}
+        <button class="torch" class:on={torch} aria-label="Lampe" onclick={() => scanner?.setTorch((torch = !torch))}>🔦</button>
+      {/if}
       {#if added}<div class="ok" transition:fade>✅ {added} ajouté — scanne le suivant</div>{/if}
     </div>
-    {#if cameraError}<p class="err">{cameraError}</p>{:else}<p class="hint">Vise le code-barres, il est lu tout seul.</p>{/if}
+    {#if scanner?.zoom}
+      <label class="zoom">
+        🔍
+        <input
+          type="range"
+          min={scanner.zoom.min}
+          max={scanner.zoom.max}
+          step={scanner.zoom.step}
+          bind:value={zoom}
+          oninput={() => scanner?.setZoom(zoom)}
+          aria-label="Zoom"
+        />
+        <span>×{zoom.toFixed(1)}</span>
+      </label>
+    {/if}
+    {#if cameraError}<p class="err">{cameraError}</p>{:else}<p class="hint">Tiens le téléphone à 15–20 cm et zoome : un code trop près reste flou.</p>{/if}
+    <label class="btn ghost photo">
+      📸 Code-barres petit ou flou ? Prends-le en photo
+      <input type="file" accept="image/*" capture="environment" onchange={barcodePhoto} hidden />
+    </label>
+    {#if photoError}<p class="err">{photoError}</p>{/if}
     <form class="manual" onsubmit={submitManual}>
       <input bind:value={manual} inputmode="numeric" placeholder="ou tape le code : 3017620422003" aria-label="Code-barres" autocomplete="off" />
       <button class="btn" type="submit" disabled={!manual.trim()}>OK</button>
@@ -286,6 +331,19 @@
     text-align: center;
   }
   .hint { margin: 0; color: var(--muted); font-size: 14px; }
+  .torch {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 22px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.45);
+  }
+  .torch.on { background: var(--amber); }
+  .zoom { display: flex; align-items: center; gap: 10px; }
+  .zoom input { flex: 1; padding: 0; border: 0; background: none; accent-color: var(--green); }
+  .zoom span { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; }
   .err { margin: 0; color: var(--danger); font-size: 15px; }
   .manual { display: flex; gap: 8px; }
   .manual .btn { flex: none; }
