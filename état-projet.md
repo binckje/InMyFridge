@@ -6,7 +6,7 @@ _Dernière mise à jour : 2026-10-15 (travail de nuit)_
 
 Phase : **développement — toutes les fonctions du cahier des charges sont codées**, à tester sur iPhone.
 
-- Fait : PWA Svelte 5 + Vite + TypeScript, base locale IndexedDB (Dexie), **liste de courses**, **stock**, **recettes**, **scan code-barres + Open Food Facts**, **photo d'emballage (OCR)**, **emplacements configurables**, **synchro Google Drive** (manuelle + automatique silencieuse), **sauvegarde / restauration JSON**, **tests automatiques** (vitest, 28 tests, lancés par le déploiement).
+- Fait : PWA Svelte 5 + Vite + TypeScript, base locale IndexedDB (Dexie), **liste de courses**, **stock**, **recettes**, **scan code-barres + Open Food Facts**, **photo d'emballage (OCR)**, **emplacements configurables**, **synchro Google Drive** (manuelle + automatique silencieuse), **sauvegarde / restauration JSON**, **tests automatiques** (vitest, 37 tests, lancés par le déploiement).
 - **En ligne** : https://binckje.github.io/InMyFridge/ (version de `main` ; le travail de la nuit est sur la branche `claude/magical-albattani-uk1t3k`, à fusionner).
 - Reste à faire par toi : configurer Google Cloud (synchro), tester sur iPhone (voir « À tester » plus bas).
 
@@ -82,6 +82,14 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - **Créer / modifier / supprimer** une recette : ingrédients un par ligne (« 200 g farine », « 2 c. à soupe d'huile », « sel »), étapes une par ligne, emoji, temps, étiquettes.
 - **Internet (TheMealDB, gratuit, sans compte)** : « Chercher « x » sur internet » (nom de plat ou ingrédient traduit fr → en) et « Idées sur internet avec mon stock ». Aperçu comparé au stock, puis « Enregistrer dans mes recettes ». Ingrédients et mesures traduits (cup, tbsp, lb, oz) ; **étapes en anglais** (pas d'API de recettes françaises gratuite accessible depuis le navigateur).
 
+## 5 ter bis. Import / export de recettes (implémenté)
+
+- Bouton **＋** de l'écran Recettes : « ✏️ Saisir à la main », « 📄 Importer un fichier » (**PDF, Word .docx, RTF, texte .txt/.md, JSON**), « 📸 Photo d'une recette » (OCR).
+- **Une recette par fichier** (JSON exporté par l'app : plusieurs acceptées). Le texte est découpé en **fiche normalisée** (nom, personnes, temps, ingrédients, étapes) grâce aux titres « Ingrédients », « Préparation »… ou, sans titres, en devinant (lignes courtes = ingrédients, phrases = étapes). La fiche s'ouvre dans l'éditeur pour vérification avant enregistrement.
+- PDF scanné (sans texte) : message invitant à utiliser la photo.
+- **Export** au choix du format (**PDF, Word, Texte, Markdown, JSON**) : une recette (« ⬇️ Exporter » en bas de la fiche) ou toutes celles affichées (« ⬇️ Exporter ces N recettes » sous la liste). Même fiche normalisée dans tous les formats. Sur iPhone : feuille de partage (Fichiers, Mail…). Dernier format choisi mémorisé.
+- Tout fonctionne hors ligne (lecteurs PDF/Word inclus dans l'app).
+
 ## 5 quater. Scan code-barres et photo (implémenté)
 
 - Bouton **📷** à droite du champ de saisie (Stock : ranger ; Courses : ajouter à la liste ; remplace ＋ quand le champ est vide).
@@ -141,6 +149,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - [x] Source de données code-barres : **Open Food Facts**.
 - [x] Moteur OCR : **Tesseract.js local** (servi par l'app).
 - [x] Recettes internet : **TheMealDB** (anglais, ingrédients traduits). Alternative française à trouver si besoin (aucune API gratuite avec CORS connue).
+- [x] Synchro concurrente : version Drive vérifiée avant écriture, relecture + nouvelle fusion en cas de conflit (3 essais) ; fichier illisible / version inconnue → erreur, rien n'est écrasé.
 - [ ] Synchro : connexion Google limitée à 1 h (flux sans serveur). Pour une synchro auto permanente, il faudrait un petit serveur (ex. Cloudflare Worker) qui garde un jeton de rafraîchissement.
 - [ ] Gestion des dates de péremption ? (non demandé pour l'instant)
 
@@ -180,6 +189,9 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/lib/barcode.ts` | Caméra (BarcodeDetector / ZXing), Open Food Facts, mémoire produits |
 | `src/lib/ocr.ts` | Tesseract.js, suggestions de nom et contenance |
 | `src/lib/backup.ts` | Sauvegarde / restauration JSON |
+| `src/lib/recipe-import.ts` | Texte des fichiers (pdf, docx, rtf, txt) → fiche recette normalisée |
+| `src/lib/recipe-export.ts` | Export PDF, Word, texte, Markdown, JSON ; partage / téléchargement |
+| `src/views/ExportSheet.svelte` | Choix du format d'export |
 | `src/lib/autosync.ts` | Synchro automatique silencieuse |
 | `tests/*.test.ts` | Tests automatiques (vitest + fake-indexeddb) |
 | `src/lib/types.ts` | Modèle de données (StockItem, ShoppingItem, Recipe, Product, Location…) |
@@ -207,6 +219,8 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 6. **Emplacements** : Stock → ⚙️ au bout des puces → ajouter « Cave », une sous-catégorie, réordonner.
 7. **Internet** : Recettes → taper « poulet » → « Chercher sur internet » → ouvrir → « Enregistrer ».
 8. **Sauvegarde** : ☁️ → « Télécharger » (le fichier part dans Fichiers).
+9. **Import** : Recettes → ＋ → « Importer un fichier » → choisir un PDF ou un Word de recette (dans Fichiers) → vérifier la fiche → Enregistrer. Idem « Photo d'une recette » sur une page de livre.
+10. **Export** : ouvrir une recette → « ⬇️ Exporter » → PDF → « Enregistrer dans Fichiers ».
 
 ## Prochaines étapes
 
@@ -240,3 +254,5 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-14 | Recettes internet : TheMealDB (seule API gratuite sans clé accessible depuis le navigateur), ingrédients traduits. |
 | 2026-10-14 | OCR : Tesseract.js servi par l'app (pas de CDN), mis en cache à la première utilisation. |
 | 2026-10-14 | Sauvegarde JSON locale + synchro auto silencieuse (si connexion Google < 1 h). |
+| 2026-10-15 | Corrections : synchro sans écrasement (contrôle de version Drive), rangement relu en base, mesures TheMealDB (fractions, parenthèses, unités). |
+| 2026-10-15 | Import de recettes (pdf via pdf.js, docx via fflate, rtf, txt, json, photo) en fiche normalisée vérifiée avant enregistrement ; export PDF (jsPDF), Word, texte, Markdown, JSON. |

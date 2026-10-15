@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchWebRecipe, ideasFromStock, toEnglish, toFrench } from '../src/lib/web-recipes';
+import { fetchWebRecipe, ideasFromStock, measure, toEnglish, toFrench } from '../src/lib/web-recipes';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -11,6 +11,17 @@ describe('traduction', () => {
     expect(toEnglish('oeufs')).toBe('egg');
     expect(toFrench('Minced Beef')).toBe('boeuf haché');
     expect(toFrench('Quinoa')).toBe('quinoa');
+  });
+});
+
+describe('measure', () => {
+  it('fractions, parenthèses, unités anglaises', () => {
+    expect(measure('1 1/2 cups')).toEqual({ qty: 360, unit: 'ml' });
+    expect(measure('1 (400g) tin')).toEqual({ qty: 400, unit: 'g' });
+    expect(measure('½ tsp')).toEqual({ qty: 0.5, unit: 'c. à café' });
+    expect(measure('2 slices')).toEqual({ qty: 2, unit: 'tranche' });
+    expect(measure('3 chopped')).toEqual({ qty: 3, unit: 'pièce' });
+    expect(measure('to taste')).toEqual({});
   });
 });
 
@@ -39,7 +50,7 @@ describe('TheMealDB', () => {
       { name: 'poulet', qty: 500, unit: 'g' },
       { name: 'sauce soja', qty: 180, unit: 'ml' },
       { name: 'oeufs', qty: 2, unit: 'pièce' },
-      { name: 'ail' }
+      { name: 'ail', qty: 3, unit: 'gousse' }
     ]);
     expect(r.steps).toEqual(['Preheat oven.', 'Mix everything.']);
     expect(r.tags).toEqual(['chicken', 'japanese']);

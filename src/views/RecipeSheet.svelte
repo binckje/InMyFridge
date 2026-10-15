@@ -17,8 +17,16 @@
     stock,
     onclose,
     onedit,
-    onsave
-  }: { recipe: Recipe; stock: StockItem[]; onclose: () => void; onedit?: () => void; onsave?: () => void } = $props();
+    onsave,
+    onexport
+  }: {
+    recipe: Recipe;
+    stock: StockItem[];
+    onclose: () => void;
+    onedit?: () => void;
+    onsave?: () => void;
+    onexport?: () => void;
+  } = $props();
 
   /** Nombre de personnes : les quantités suivent. */
   let servings = $state(0);
@@ -130,6 +138,7 @@
   {#if onedit}
     <div class="foot">
       <button class="link" onclick={onedit}>✏️ Modifier la recette</button>
+      {#if onexport}<button class="link" onclick={onexport}>⬇️ Exporter</button>{/if}
     </div>
   {/if}
 </div>

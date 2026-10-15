@@ -46,7 +46,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        globPatterns: ['**/*.{js,mjs,css,html,png,svg,webmanifest}'],
         globIgnores: ['**/tesseract/**'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /\/tesseract\//,

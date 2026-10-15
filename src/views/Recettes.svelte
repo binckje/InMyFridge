@@ -1,6 +1,6 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
-  import { fade } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
   import { rank, saveRecipe, tokens, type RecipeCheck } from '../lib/recipes';
@@ -8,6 +8,8 @@
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
   import RecipeEditor from './RecipeEditor.svelte';
+  import ExportSheet from './ExportSheet.svelte';
+  import { IMPORT_ACCEPT, fileText, parseRecipeJson, parseRecipeText } from '../lib/recipe-import';
 
   const recipes = liveQuery(() => db.recipes.filter((r) => !r.deleted).toArray());
   const stock = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
@@ -38,7 +40,63 @@
   /* ---------- Feuilles ---------- */
   let openId = $state<string | null>(null);
   const opened = $derived(ranked.find((c) => c.recipe.id === openId)?.recipe ?? null);
-  let editing = $state<Recipe | 'new' | null>(null);
+  let editing = $state.raw<Recipe | 'new' | null>(null);
+
+  /* ---------- Ajout : saisie, fichier, photo ---------- */
+  let adding = $state(false);
+  let importing = $state('');
+  let importError = $state('');
+  let exporting = $state.raw<Recipe[] | null>(null);
+  let toast = $state('');
+
+  /** Fiche importée : pas d'id, l'éditeur l'enregistre comme nouvelle recette. */
+  const draft = (r: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => ({ ...r, id: '', createdAt: 0, updatedAt: 0 }) as Recipe;
+
+  async function importFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    importError = '';
+    importing = `Lecture de « ${file.name} »…`;
+    try {
+      const text = await fileText(file);
+      if (/\.json$/i.test(file.name)) {
+        const list = parseRecipeJson(text);
+        if (!list.length) throw new Error('Aucune recette dans ce fichier.');
+        if (list.length === 1) editing = draft(list[0]);
+        else {
+          for (const r of list) await saveRecipe(r);
+          toast = `${list.length} recettes importées`;
+          setTimeout(() => (toast = ''), 3000);
+        }
+      } else editing = draft(parseRecipeText(text));
+      adding = false;
+    } catch (err) {
+      importError = err instanceof Error && err.message.length < 120 ? err.message : 'Fichier illisible.';
+    } finally {
+      importing = '';
+    }
+  }
+
+  async function importPhoto(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    importError = '';
+    importing = 'Lecture de la photo…';
+    try {
+      const { readPhoto } = await import('../lib/ocr');
+      const lines = await readPhoto(file, (p) => (importing = `Lecture de la photo… ${Math.round(p * 100)} %`));
+      editing = draft(parseRecipeText(lines.map((l) => l.text).join('\n')));
+      adding = false;
+    } catch {
+      importError = 'Lecture de la photo impossible (première utilisation : connexion internet nécessaire).';
+    } finally {
+      importing = '';
+    }
+  }
 
   /* ---------- Internet ---------- */
   let web = $state<{ title: string; hits: WebHit[] } | null>(null);
@@ -113,7 +171,7 @@
 
 <div class="search">
   <input bind:value={text} placeholder="Chercher : nom, ingrédient, « dessert »…" enterkeyhint="search" autocomplete="off" aria-label="Chercher une recette" />
-  <button class="btn" aria-label="Nouvelle recette" onclick={() => (editing = 'new')}>＋</button>
+  <button class="btn" aria-label="Ajouter une recette" onclick={() => ((adding = true), (importError = ''))}>＋</button>
 </div>
 
 {#if shown.length === 0}
@@ -152,6 +210,10 @@
   {/each}
 </ul>
 
+{#if shown.length > 1}
+  <button class="link export" onclick={() => (exporting = shown.map((c) => c.recipe))}>⬇️ Exporter ces {shown.length} recettes</button>
+{/if}
+
 <div class="web">
   {#if text.trim()}
     <button class="btn ghost" onclick={searchOnline} disabled={webBusy}>🌐 Chercher « {text.trim()} » sur internet</button>
@@ -188,7 +250,35 @@
     stock={$stock ?? []}
     onclose={() => (openId = null)}
     onedit={() => ((editing = opened), (openId = null))}
+    onexport={() => (exporting = [opened!])}
   />
+{/if}
+
+{#if adding}
+  <button class="backdrop" aria-label="Fermer" onclick={() => (adding = false)} transition:fade={{ duration: 150 }}></button>
+  <div class="sheet" transition:fly={{ y: 300, duration: 200 }} role="dialog" aria-label="Ajouter une recette">
+    <h2>Ajouter une recette</h2>
+    <button class="btn ghost opt" onclick={() => ((adding = false), (editing = 'new'))}>✏️ Saisir à la main</button>
+    <label class="btn ghost opt">
+      📄 Importer un fichier <small>PDF, Word, RTF, texte, JSON</small>
+      <input type="file" accept={IMPORT_ACCEPT} onchange={importFile} hidden />
+    </label>
+    <label class="btn ghost opt">
+      📸 Photo d'une recette <small>livre, fiche, magazine</small>
+      <input type="file" accept="image/*" onchange={importPhoto} hidden />
+    </label>
+    {#if importing}<p class="hint">{importing}</p>{/if}
+    {#if importError}<p class="err">{importError}</p>{/if}
+    <p class="hint">Une recette par fichier. La fiche est remplie automatiquement, tu la vérifies avant d'enregistrer.</p>
+  </div>
+{/if}
+
+{#if exporting}
+  <ExportSheet recipes={exporting} onclose={() => (exporting = null)} />
+{/if}
+
+{#if toast}
+  <div class="toast" transition:fly={{ y: 40 }}>{toast}</div>
 {/if}
 
 {#if editing}
@@ -275,6 +365,40 @@
   .card img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; }
   .hint { margin: 0; color: var(--muted); font-size: 14px; }
   .err { margin: 0; color: var(--danger); font-size: 14px; }
+
+  .export { display: block; margin: 12px auto 0; color: var(--muted); font-size: 15px; padding: 8px; }
+  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 40; }
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 16px calc(env(safe-area-inset-bottom) + 16px);
+    border-radius: 20px 20px 0 0;
+    background: var(--bg);
+    z-index: 50;
+  }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .opt { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .opt small { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .toast {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px);
+    max-width: 608px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #292524;
+    color: #fff;
+    z-index: 20;
+  }
 
   .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
   .big { font-size: 64px; }

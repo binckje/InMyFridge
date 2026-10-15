@@ -147,7 +147,9 @@ export async function applyRestock(lines: RestockLine[]): Promise<number> {
     } else {
       const q = parseFloat(l.qty.replace(',', '.'));
       if (!Number.isFinite(q) || q <= 0) continue;
-      await updateStock(s.id, { qty: Math.round(((s.qty ?? 0) + q) * 1000) / 1000 });
+      // relu en base : le stock a pu changer depuis l'ouverture de la feuille (cuisine, synchro)
+      const cur = await db.stock.get(s.id);
+      await updateStock(s.id, { qty: Math.round(((cur?.qty ?? 0) + q) * 1000) / 1000 });
     }
     n++;
   }

@@ -62,22 +62,49 @@ export function toEnglish(fr: string): string | undefined {
   }
 }
 
-/** Mesures anglaises → quantité (« 200g », « 1 cup », « 2 tbsp », « 1/2 »). */
-function measure(m: string): Pick<RecipeIngredient, 'qty' | 'unit'> {
-  const s = m.trim().toLowerCase();
-  const n = s.match(/^(\d+(?:[.,]\d+)?)(?:\s*\/\s*(\d+))?/);
+/** Unités anglaises sans équivalent métrique → libellé français. */
+const EN_UNITS: [RegExp, string][] = [
+  [/^cloves?\b/, 'gousse'],
+  [/^(tins?|cans?)\b/, 'boîte'],
+  [/^slices?\b/, 'tranche'],
+  [/^pinch(es)?\b/, 'pincée'],
+  [/^sprigs?\b/, 'brin'],
+  [/^handfuls?\b/, 'poignée'],
+  [/^(packets?|sachets?)\b/, 'sachet'],
+  [/^leaves\b|^leaf\b/, 'feuille'],
+  [/^dash(es)?\b/, 'trait'],
+  [/^bunch(es)?\b/, 'botte'],
+  [/^sticks?\b/, 'bâton']
+];
+
+/** Mesures anglaises → quantité (« 200g », « 1 1/2 cups », « 2 tbsp », « 1 (400g) tin », « ½ »). */
+export function measure(m: string): Pick<RecipeIngredient, 'qty' | 'unit'> {
+  let s = m
+    .trim()
+    .toLowerCase()
+    .replace(/½/g, ' 1/2')
+    .replace(/¼/g, ' 1/4')
+    .replace(/¾/g, ' 3/4')
+    .trim();
+  // « 1 (400g) tin » : la contenance entre parenthèses est la vraie quantité
+  const paren = s.match(/^(\d+)\s*\(\s*(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\s*\)/);
+  if (paren) return { qty: +paren[1] * +paren[2].replace(',', '.'), unit: paren[3] };
+  const n = s.match(/^(?:(\d+)\s+)?(\d+(?:[.,]\d+)?)(?:\s*\/\s*(\d+))?/);
   if (!n) return {};
-  const qty = n[2] ? +n[1] / +n[2] : +n[1].replace(',', '.');
-  const rest = s.slice(n[0].length).trim();
-  const u = rest.match(/^(kg|g|ml|cl|l)\b/);
+  const frac = n[3] ? +n[2] / +n[3] : +n[2].replace(',', '.');
+  const qty = Math.round(((n[1] ? +n[1] : 0) + frac) * 100) / 100;
+  s = s.slice(n[0].length).trim();
+  const u = s.match(/^(kg|g|ml|cl|l)\b/);
   if (u) return { qty, unit: u[1] };
-  if (/^lbs?\b|^pounds?\b/.test(rest)) return { qty: Math.round(qty * 454), unit: 'g' };
-  if (/^oz\b/.test(rest)) return { qty: Math.round(qty * 28), unit: 'g' };
-  if (/^cups?\b/.test(rest)) return { qty: Math.round(qty * 240), unit: 'ml' };
-  if (/^tbsp|^tablespoons?/.test(rest)) return { qty, unit: 'c. à soupe' };
-  if (/^tsp|^teaspoons?/.test(rest)) return { qty, unit: 'c. à café' };
-  if (!rest || /^(large|medium|small|whole)/.test(rest)) return { qty, unit: 'pièce' };
-  return {};
+  if (/^lbs?\b|^pounds?\b/.test(s)) return { qty: Math.round(qty * 454), unit: 'g' };
+  if (/^oz\b|^ounces?\b/.test(s)) return { qty: Math.round(qty * 28), unit: 'g' };
+  if (/^cups?\b/.test(s)) return { qty: Math.round(qty * 240), unit: 'ml' };
+  if (/^tbsp|^tablespoons?|^tbs\b/.test(s)) return { qty, unit: 'c. à soupe' };
+  if (/^tsp|^teaspoons?/.test(s)) return { qty, unit: 'c. à café' };
+  const label = EN_UNITS.find(([re]) => re.test(s))?.[1];
+  if (label) return { qty, unit: label };
+  // « 2 », « 2 large », « 3 chopped » : nombre de pièces
+  return { qty, unit: 'pièce' };
 }
 
 interface Meal {
