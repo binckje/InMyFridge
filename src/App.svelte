@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Home from './views/Home.svelte';
   import Courses from './views/Courses.svelte';
   import Stock from './views/Stock.svelte';
   import Recettes from './views/Recettes.svelte';
@@ -11,15 +12,16 @@
   let { pending = null }: { pending?: Pending | null } = $props();
   let syncOpen = $state(untrack(() => !!pending));
 
-  type Tab = 'stock' | 'courses' | 'recettes';
+  type Tab = 'accueil' | 'stock' | 'courses' | 'recettes';
   const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'accueil', label: 'Accueil', icon: '🏠' },
     { id: 'stock', label: 'Stock', icon: '🧊' },
     { id: 'courses', label: 'Courses', icon: '🛒' },
     { id: 'recettes', label: 'Recettes', icon: '🍳' }
   ];
 
   const initial = location.hash.slice(1) as Tab;
-  let tab = $state<Tab>(tabs.some((t) => t.id === initial) ? initial : 'courses');
+  let tab = $state<Tab>(tabs.some((t) => t.id === initial) ? initial : 'accueil');
   $effect(() => {
     history.replaceState(null, '', `#${tab}`);
   });
@@ -29,7 +31,9 @@
 
 <main>
   <button class="cloud" aria-label="Synchro" onclick={() => (syncOpen = true)}>☁️</button>
-  {#if tab === 'courses'}
+  {#if tab === 'accueil'}
+    <Home ongo={(t) => (tab = t)} />
+  {:else if tab === 'courses'}
     <Courses />
   {:else if tab === 'stock'}
     <Stock />

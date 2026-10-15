@@ -175,6 +175,7 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | Fichier | Rôle |
 |---------|------|
 | `src/App.svelte` | Onglets du bas, routage par `#hash` |
+| `src/views/Home.svelte` | Accueil (accès aux onglets, ajout rapide stock et courses) |
 | `src/views/Courses.svelte` | Écran liste de courses |
 | `src/views/Stock.svelte` | Écran stock |
 | `src/views/Recettes.svelte` | Écran recettes (liste, filtres, recherche, internet) |
@@ -257,3 +258,4 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-15 | Corrections : synchro sans écrasement (contrôle de version Drive), rangement relu en base, mesures TheMealDB (fractions, parenthèses, unités). |
 | 2026-10-15 | Import de recettes (pdf via pdf.js, docx via fflate, rtf, txt, json, photo) en fiche normalisée vérifiée avant enregistrement ; export PDF (jsPDF), Word, texte, Markdown, JSON. |
 | 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
+| 2026-10-15 | Onglet Accueil (par défaut) : accès Stock/Courses/Recettes + ajout rapide stock et courses (texte ou scan). Scanner : 1920×1080, mise au point continue, zoom ×2 par défaut + curseur, lampe, lecture du code-barres sur photo, ZXing TRY_HARDER. |
