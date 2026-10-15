@@ -7,6 +7,7 @@
     formatIngredient,
     rateRecipe,
     undoCook,
+    yieldLabel,
     type Consumption
   } from '../lib/recipes';
   import type { Recipe, StockItem } from '../lib/types';
@@ -28,12 +29,14 @@
     onexport?: () => void;
   } = $props();
 
-  /** Nombre de personnes : les quantités suivent. */
+  /** Nombre de personnes (ou de pièces) : les quantités suivent. */
   let servings = $state(0);
   $effect.pre(() => {
     if (!servings) servings = recipe.servings;
   });
   const scale = $derived(servings / recipe.servings);
+  /** Pas du −/+ : 1 personne, ou ~10 % de la fournée (20 cookies → 2 par 2). */
+  const step = $derived(recipe.yieldUnit ? Math.max(1, Math.round(recipe.servings / 10)) : 1);
   const check = $derived(checkRecipe(recipe, stock, scale));
 
   const ICON = { ok: '✅', low: '🟠', missing: '❌', basic: '🧂' } as const;
@@ -93,9 +96,9 @@
   <div class="facts">
     {#if recipe.time}<span>⏱ {recipe.time} min</span>{/if}
     <span class="servings">
-      <button onclick={() => (servings = Math.max(1, servings - 1))} disabled={servings <= 1} aria-label="Moins de personnes">−</button>
-      👥 {servings} pers.
-      <button onclick={() => servings++} aria-label="Plus de personnes">+</button>
+      <button onclick={() => (servings = Math.max(1, servings - step))} disabled={servings <= 1} aria-label="Moins">−</button>
+      {recipe.yieldUnit ? '🔢' : '👥'} {yieldLabel(servings, recipe.yieldUnit)}
+      <button onclick={() => (servings += step)} aria-label="Plus">+</button>
     </span>
     {#each recipe.tags ?? [] as t}<span class="tag">{t}</span>{/each}
   </div>

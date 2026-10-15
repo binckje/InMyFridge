@@ -75,10 +75,10 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 ## 5 ter. Recettes (implémenté)
 
-- **30 recettes de base** (cuisine maison : crêpes, carbonara, gratin, quiche…), identifiants fixes `base-*` : pas de doublon à la synchro, une recette supprimée n'est pas réinstallée.
+- **31 recettes de base** (cuisine maison : crêpes, carbonara, gratin, quiche…), identifiants fixes `base-*` : pas de doublon à la synchro, une recette supprimée n'est pas réinstallée.
 - **Comparaison au stock** : pluriels, accents, « œ », noms composés (« pomme de terre » ≠ « pomme », « lait de coco » ≠ « lait »), produits précis → génériques (spaghetti → pâtes, emmental → fromage, steak haché → boeuf haché). Quantités converties (g/kg, ml/cl/l, pièces) : quantité insuffisante = 🟠 « pas assez ». Sel, poivre, eau : toujours considérés présents (🧂 placard). Ingrédients « (facultatif) » non bloquants.
 - Liste triée : faisables d'abord, puis par nombre de manquants ; anneau = part des ingrédients disponibles. Filtres **Toutes / ✅ Faisables / 🛒 Presque (1–2 manquants) / ⭐ Favorites (≥ 4 étoiles)**. Recherche par nom, ingrédient ou étiquette.
-- **Fiche recette** : nombre de personnes ajustable (quantités recalculées), note sur 5 étoiles, « 🛒 Ajouter les manquants aux courses », **« 👩‍🍳 J'ai cuisiné ça »** (retire les quantités du stock, descend d'un niveau les produits suivis par niveau ; annulable).
+- **Fiche recette** : nombre de personnes — ou de pièces si la recette a une unité (« 20 cookies », champ « Unité » dans l'éditeur) — ajustable (quantités recalculées), note sur 5 étoiles, « 🛒 Ajouter les manquants aux courses », **« 👩‍🍳 J'ai cuisiné ça »** (retire les quantités du stock, descend d'un niveau les produits suivis par niveau ; annulable).
 - **Créer / modifier / supprimer** une recette : ingrédients un par ligne (« 200 g farine », « 2 c. à soupe d'huile », « sel »), étapes une par ligne, emoji, temps, étiquettes.
 - **Internet (TheMealDB, gratuit, sans compte)** : « Chercher « x » sur internet » (nom de plat ou ingrédient traduit fr → en) et « Idées sur internet avec mon stock ». Aperçu comparé au stock, puis « Enregistrer dans mes recettes ». Ingrédients et mesures traduits (cup, tbsp, lb, oz) ; **étapes en anglais** (pas d'API de recettes françaises gratuite accessible depuis le navigateur).
 
@@ -212,7 +212,7 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 ## À tester (par toi, sur iPhone)
 
 1. Fusionner la branche `claude/magical-albattani-uk1t3k` dans `main` (PR sur GitHub) → déploiement auto → rouvrir la PWA (fermer/rouvrir 2 fois pour la mise à jour).
-2. **Recettes** : onglet Recettes → 30 recettes. Ajouter « oeufs 6 », « beurre », « fromage râpé 200 g » dans Stock → « Omelette au fromage » doit passer en ✅ Faisable. Ouvrir, « J'ai cuisiné ça » → vérifier le stock (oeufs 2) puis « Annuler ».
+2. **Recettes** : onglet Recettes → 31 recettes. Ajouter « oeufs 6 », « beurre », « fromage râpé 200 g » dans Stock → « Omelette au fromage » doit passer en ✅ Faisable. Ouvrir, « J'ai cuisiné ça » → vérifier le stock (oeufs 2) puis « Annuler ».
 3. **Scan** : Stock → 📷 → autoriser la caméra → viser un code-barres (ex. pot de Nutella) → fiche remplie → « Ranger ». Rescanner le même produit hors ligne (mode avion) → reconnu.
 4. **Photo** : 📷 → « Photo de l'emballage » → photographier un paquet sans code lisible → choisir le nom proposé. (1re fois : connexion nécessaire, ~5 Mo.)
 5. **Courses → stock** : cocher des articles → « Ranger et vider le panier » → vérifier les quantités dans Stock.
@@ -247,6 +247,7 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-14 | Stock : choix du type de quantité à la saisie (puces). |
 | 2026-10-14 | Synchro Drive : manuelle (bouton), fichier unique partagé, dernière modif gagne, OAuth par redirection. |
 | 2026-10-14 | Tests automatiques (vitest + fake-indexeddb), lancés avant chaque déploiement. |
+| 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
 | 2026-10-14 | Recettes : 30 recettes de base à identifiants fixes, comparaison au stock avec conversions d'unités, « J'ai cuisiné ça » déduit le stock. |
 | 2026-10-14 | Vider le panier → ranger les achats dans le stock (quantités converties). |
 | 2026-10-14 | Code-barres : BarcodeDetector + repli ZXing ; Open Food Facts ; produits mémorisés et synchronisés. |

@@ -9,7 +9,8 @@ import {
   matches,
   parseIngredient,
   seedRecipes,
-  undoCook
+  undoCook,
+  yieldLabel
 } from '../src/lib/recipes';
 import { SEED_RECIPES } from '../src/lib/recipes-seed';
 
@@ -124,5 +125,13 @@ describe('checkRecipe / cook', () => {
     await seedRecipes();
     expect(await db.recipes.count()).toBe(n);
     expect((await db.recipes.get('base-crepes'))?.deleted).toBe(true);
+  });
+});
+
+describe('yieldLabel', () => {
+  it('affiche des personnes ou des pièces', () => {
+    expect(yieldLabel(4)).toBe('4 pers.');
+    expect(yieldLabel(20, 'cookies')).toBe('20 cookies');
+    expect(yieldLabel(1, 'cookies')).toBe('1 cookie');
   });
 });

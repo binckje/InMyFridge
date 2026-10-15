@@ -1,4 +1,4 @@
-import { formatIngredient } from './recipes';
+import { formatIngredient, yieldLabel } from './recipes';
 import type { Recipe } from './types';
 
 export type ExportFormat = 'txt' | 'md' | 'docx' | 'pdf' | 'json';
@@ -22,7 +22,7 @@ interface Sheet {
 
 function sheet(r: Recipe): Sheet {
   const meta = [
-    `${r.servings} personne${r.servings > 1 ? 's' : ''}`,
+    r.yieldUnit ? yieldLabel(r.servings, r.yieldUnit) : `${r.servings} personne${r.servings > 1 ? 's' : ''}`,
     r.time ? `${r.time} min` : '',
     r.rating ? `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}` : '',
     r.tags?.length ? r.tags.join(', ') : ''

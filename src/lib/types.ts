@@ -75,6 +75,8 @@ export interface Recipe extends SyncFields {
   name: string;
   emoji?: string;
   servings: number;
+  /** Ce que compte servings quand ce ne sont pas des personnes (« cookies », « crêpes »…). */
+  yieldUnit?: string;
   /** Temps total en minutes. */
   time?: number;
   tags?: string[];

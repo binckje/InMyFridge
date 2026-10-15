@@ -17,6 +17,7 @@
     name: r?.name ?? '',
     emoji: r?.emoji ?? '🍽️',
     servings: String(r?.servings ?? 4),
+    yieldUnit: r?.yieldUnit ?? '',
     time: r?.time ? String(r.time) : '',
     tags: (r?.tags ?? []).join(', '),
     ingredients: (r?.ingredients ?? []).map((i) => formatIngredient(i) + (i.optional ? ' (facultatif)' : '')).join('\n'),
@@ -34,6 +35,7 @@
       name: form.name.trim(),
       emoji: form.emoji.trim() || undefined,
       servings: Math.max(1, parseInt(form.servings) || 4),
+      yieldUnit: /^(pers|$)/i.test(form.yieldUnit.trim()) ? undefined : form.yieldUnit.trim(),
       time: parseInt(form.time) || undefined,
       tags: form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
       ingredients: lines(form.ingredients).map(parseIngredient),
@@ -71,8 +73,12 @@
 
   <div class="row">
     <label>
-      <span class="lbl">Personnes</span>
-      <input bind:value={form.servings} inputmode="numeric" aria-label="Personnes" />
+      <span class="lbl">Quantité</span>
+      <input bind:value={form.servings} inputmode="numeric" aria-label="Quantité" />
+    </label>
+    <label>
+      <span class="lbl">Unité (vide = personnes)</span>
+      <input bind:value={form.yieldUnit} placeholder="personnes" aria-label="Unité" />
     </label>
     <label>
       <span class="lbl">Temps (min)</span>
