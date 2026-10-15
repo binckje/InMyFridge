@@ -280,6 +280,7 @@ export async function seedRecipes() {
       name: r.name,
       emoji: r.emoji,
       servings: r.servings,
+      yieldUnit: r.yieldUnit,
       time: r.time,
       tags: r.tags,
       ingredients: r.ingredients.map(parseIngredient),
@@ -289,4 +290,10 @@ export async function seedRecipes() {
       updatedAt: 0
     }))
   );
+}
+
+/** « 4 pers. », « 20 cookies », « 1 cookie ». */
+export function yieldLabel(n: number, unit?: string): string {
+  if (!unit) return `${n} pers.`;
+  return `${n} ${n > 1 ? unit : unit.replace(/s$/, '')}`;
 }

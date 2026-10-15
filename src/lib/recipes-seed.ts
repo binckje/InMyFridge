@@ -4,6 +4,7 @@ export interface SeedRecipe {
   name: string;
   emoji: string;
   servings: number;
+  yieldUnit?: string;
   time: number;
   tags: string[];
   ingredients: string[];
@@ -441,6 +442,22 @@ export const SEED_RECIPES: SeedRecipe[] = [
       'Porter le lait à frémissement avec le sucre vanillé.',
       'Ajouter le riz, cuire 35 min à feu doux en remuant.',
       'Ajouter le sucre en fin de cuisson. Servir tiède ou froid.'
+    ]
+  },
+  {
+    id: 'base-cookies',
+    name: 'Cookies aux pépites de chocolat',
+    emoji: '🍪',
+    servings: 20,
+    yieldUnit: 'cookies',
+    time: 30,
+    tags: ['dessert', 'goûter'],
+    ingredients: ['250 g farine', '125 g beurre', '150 g sucre', '1 oeuf', '150 g pépites de chocolat', '1 sachet de levure'],
+    steps: [
+      'Préchauffer le four à 180 °C.',
+      'Mélanger le beurre mou et le sucre, ajouter l\'oeuf.',
+      'Incorporer farine et levure, puis les pépites.',
+      'Former des boules sur une plaque, cuire 10 à 12 min.'
     ]
   }
 ];
