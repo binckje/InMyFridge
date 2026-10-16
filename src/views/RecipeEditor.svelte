@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { fade, fly } from 'svelte/transition';
-  import { deleteRecipe, formatIngredient, parseIngredient, saveRecipe } from '../lib/recipes';
+  import { CATEGORIES, categoryOf, deleteRecipe, formatIngredient, parseIngredient, saveRecipe, withCategory, type Category } from '../lib/recipes';
   import type { Recipe } from '../lib/types';
 
   /**
@@ -24,6 +24,11 @@
     steps: (r?.steps ?? []).join('\n')
   });
 
+  const tagList = (s: string) => s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const category = $derived(categoryOf(tagList(form.tags)));
+  /** Choisir une catégorie met à jour l'étiquette correspondante (re-toucher la retire). */
+  const pickCategory = (c: Category) => (form.tags = withCategory(tagList(form.tags), category === c ? undefined : c).join(', '));
+
   const lines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
   const valid = $derived(form.name.trim() && lines(form.ingredients).length);
 
@@ -37,7 +42,7 @@
       servings: Math.max(1, parseInt(form.servings) || 4),
       yieldUnit: /^(pers|$)/i.test(form.yieldUnit.trim()) ? undefined : form.yieldUnit.trim(),
       time: parseInt(form.time) || undefined,
-      tags: form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
+      tags: tagList(form.tags),
       ingredients: lines(form.ingredients).map(parseIngredient),
       steps: lines(form.steps).map((s) => s.replace(/^\d+[.)]\s*/, '')),
       rating: r?.rating,
@@ -96,6 +101,15 @@
     <textarea bind:value={form.steps} rows="6"></textarea>
   </label>
 
+  <div class="cats" role="group" aria-label="Catégorie">
+    <span class="lbl">Catégorie</span>
+    <div>
+      {#each CATEGORIES as c}
+        <button type="button" class="cat" class:sel={category === c.key} aria-pressed={category === c.key} onclick={() => pickCategory(c.key)}>{c.emoji} {c.label}</button>
+      {/each}
+    </div>
+  </div>
+
   <label>
     <span class="lbl">Étiquettes (séparées par des virgules)</span>
     <input bind:value={form.tags} placeholder="dessert, rapide…" aria-label="Étiquettes" />
@@ -131,6 +145,10 @@
     z-index: 80;
   }
   h2 { margin: 0; font-size: 20px; }
+  .cats { display: flex; flex-direction: column; gap: 6px; }
+  .cats div { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat { padding: 6px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 15px; }
+  .cat.sel { background: var(--green); border-color: var(--green); color: #fff; }
   label { display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .lbl { font-size: 13px; color: var(--muted); }
   .row { display: flex; gap: 8px; }

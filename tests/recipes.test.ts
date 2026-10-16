@@ -3,6 +3,9 @@ import { db } from '../src/lib/db';
 import { addStock } from '../src/lib/stock';
 import {
   addMissingToShopping,
+  categoryOf,
+  setCategory,
+  withCategory,
   checkRecipe,
   cook,
   formatIngredient,
@@ -133,5 +136,27 @@ describe('yieldLabel', () => {
     expect(yieldLabel(4)).toBe('4 pers.');
     expect(yieldLabel(20, 'cookies')).toBe('20 cookies');
     expect(yieldLabel(1, 'cookies')).toBe('1 cookie');
+  });
+});
+
+describe('catégories', () => {
+  it('lit la catégorie depuis les étiquettes, accents ignorés', () => {
+    expect(categoryOf(['rapide', 'Entree'])).toBe('entrée');
+    expect(categoryOf(['rapide'])).toBeUndefined();
+  });
+
+  it('remplace l\'étiquette de catégorie sans toucher les autres', () => {
+    expect(withCategory(['dessert', 'rapide'], 'plat')).toEqual(['plat', 'rapide']);
+    expect(withCategory(['plat', 'rapide'])).toEqual(['rapide']);
+  });
+
+  it('classe plusieurs recettes d\'un coup', async () => {
+    await db.recipes.bulkPut([
+      { id: 'a', name: 'A', servings: 2, ingredients: [], steps: [], tags: ['plat'], createdAt: 0, updatedAt: 0 },
+      { id: 'b', name: 'B', servings: 2, ingredients: [], steps: [], createdAt: 0, updatedAt: 0 }
+    ] as never);
+    await setCategory(['a', 'b'], 'dessert');
+    expect((await db.recipes.get('a'))?.tags).toEqual(['dessert']);
+    expect((await db.recipes.get('b'))?.tags).toEqual(['dessert']);
   });
 });
