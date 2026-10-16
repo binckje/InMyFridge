@@ -3,7 +3,7 @@
   import { fade, fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
-  import { rank, saveRecipe, tokens, type RecipeCheck } from '../lib/recipes';
+  import { deleteRecipe, rank, saveRecipe, tokens, type RecipeCheck } from '../lib/recipes';
   import { fetchWebRecipe, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
@@ -36,6 +36,35 @@
   const shown = $derived(
     (filter === 'faisables' ? feasible : filter === 'presque' ? almost : filter === 'favorites' ? favorites : ranked).filter(found)
   );
+
+  /* ---------- Sélection : modifier / supprimer / exporter ---------- */
+  let selecting = $state(false);
+  let selected = $state<Set<string>>(new Set());
+  const picked = $derived(shown.filter((c) => selected.has(c.recipe.id)).map((c) => c.recipe));
+  const allPicked = $derived(shown.length > 0 && picked.length === shown.length);
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (!next.delete(id)) next.add(id);
+    selected = next;
+  }
+  const toggleAll = () => (selected = allPicked ? new Set() : new Set(shown.map((c) => c.recipe.id)));
+  const stopSelecting = () => ((selecting = false), (selected = new Set()));
+
+  function editPicked() {
+    if (picked.length !== 1) return;
+    editing = picked[0];
+    stopSelecting();
+  }
+
+  async function deletePicked() {
+    const n = picked.length;
+    if (!n || !confirm(`Supprimer ${n} recette${n > 1 ? 's' : ''} ? Cette action est définitive.`)) return;
+    for (const r of picked) await deleteRecipe(r.id);
+    stopSelecting();
+    toast = `${n} recette${n > 1 ? 's' : ''} supprimée${n > 1 ? 's' : ''}`;
+    setTimeout(() => (toast = ''), 3000);
+  }
 
   /* ---------- Feuilles ---------- */
   let openId = $state<string | null>(null);
@@ -169,6 +198,18 @@
   {/if}
 </div>
 
+{#if ranked.length}
+  <div class="selbar">
+    {#if selecting}
+      <button class="link" onclick={toggleAll}>{allPicked ? 'Tout désélectionner' : 'Tout sélectionner'}</button>
+      <span class="count">{picked.length} sélectionnée{picked.length > 1 ? 's' : ''}</span>
+      <button class="link" onclick={stopSelecting}>Terminer</button>
+    {:else}
+      <button class="link" onclick={() => (selecting = true)}>☑️ Sélectionner</button>
+    {/if}
+  </div>
+{/if}
+
 <div class="search">
   <input bind:value={text} placeholder="Chercher : nom, ingrédient, « dessert »…" enterkeyhint="search" autocomplete="off" aria-label="Chercher une recette" />
   <button class="btn" aria-label="Ajouter une recette" onclick={() => ((adding = true), (importError = ''))}>＋</button>
@@ -190,7 +231,13 @@
 <ul class="cards">
   {#each shown as c (c.recipe.id)}
     <li animate:flip={{ duration: 200 }}>
-      <button class="card" onclick={() => (openId = c.recipe.id)}>
+      <button
+        class="card"
+        class:picked={selecting && selected.has(c.recipe.id)}
+        aria-pressed={selecting ? selected.has(c.recipe.id) : undefined}
+        onclick={() => (selecting ? toggle(c.recipe.id) : (openId = c.recipe.id))}
+      >
+        {#if selecting}<span class="check" aria-hidden="true">{selected.has(c.recipe.id) ? '✓' : ''}</span>{/if}
         {#if c.recipe.image}<img src="{c.recipe.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">{c.recipe.emoji ?? '🍽️'}</span>{/if}
         <span class="body">
           <span class="name">{c.recipe.name}</span>
@@ -210,7 +257,13 @@
   {/each}
 </ul>
 
-{#if shown.length > 1}
+{#if selecting}
+  <div class="actions" transition:fly={{ y: 40, duration: 150 }}>
+    <button class="btn ghost" onclick={editPicked} disabled={picked.length !== 1}>✏️ Modifier</button>
+    <button class="btn ghost" onclick={() => (exporting = picked)} disabled={!picked.length}>⬇️ Exporter</button>
+    <button class="btn danger" onclick={deletePicked} disabled={!picked.length}>🗑️ Supprimer{picked.length ? ` (${picked.length})` : ''}</button>
+  </div>
+{:else if shown.length > 1}
   <button class="link export" onclick={() => (exporting = shown.map((c) => c.recipe))}>⬇️ Exporter ces {shown.length} recettes</button>
 {/if}
 
@@ -366,6 +419,37 @@
   .hint { margin: 0; color: var(--muted); font-size: 14px; }
   .err { margin: 0; color: var(--danger); font-size: 14px; }
 
+  .selbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 15px; }
+  .selbar .link { color: var(--green); padding: 4px 0; }
+  .selbar .count { color: var(--muted); font-size: 14px; }
+  .card.picked { outline: 2px solid var(--green); }
+  .check {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .picked .check { background: var(--green); border-color: var(--green); }
+  .actions {
+    position: sticky;
+    bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 8px);
+    z-index: 6;
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: var(--radius);
+    background: var(--bg);
+    box-shadow: 0 2px 12px rgb(0 0 0 / 0.15);
+  }
+  .actions .btn { flex: 1; padding-left: 4px; padding-right: 4px; font-size: 14px; }
+  .actions .btn:disabled { opacity: 0.4; }
   .export { display: block; margin: 12px auto 0; color: var(--muted); font-size: 15px; padding: 8px; }
   .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 40; }
   .sheet {
