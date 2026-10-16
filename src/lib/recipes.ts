@@ -264,6 +264,39 @@ export async function saveRecipe(r: Omit<Recipe, 'id' | 'updatedAt' | 'createdAt
 
 export const rateRecipe = (id: string, rating: number) => db.recipes.update(id, { rating, updatedAt: Date.now() });
 
+/* ---------- Catégories : portées par une étiquette (synchronisée comme les autres) ---------- */
+
+export const CATEGORIES = [
+  { key: 'entrée', label: 'Entrées', emoji: '🥗' },
+  { key: 'plat', label: 'Plats', emoji: '🍲' },
+  { key: 'dessert', label: 'Desserts', emoji: '🍰' },
+  { key: 'autre', label: 'Autres', emoji: '🍽️' }
+] as const;
+export type Category = (typeof CATEGORIES)[number]['key'];
+
+const plain = (t: string) => t.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const categoryKey = (t: string) => CATEGORIES.find((c) => plain(c.key) === plain(t))?.key;
+
+/** Catégorie d'une recette : première étiquette « entrée », « plat », « dessert » ou « autre ». */
+export const categoryOf = (tags: string[] = []): Category | undefined =>
+  tags.map(categoryKey).find((k) => k !== undefined);
+
+/** Remplace l'étiquette de catégorie (une seule à la fois), en tête de liste ; `undefined` la retire. */
+export const withCategory = (tags: string[] = [], cat?: Category): string[] => [
+  ...(cat ? [cat] : []),
+  ...tags.filter((t) => !categoryKey(t))
+];
+
+export async function setCategory(ids: string[], cat?: Category) {
+  const now = Date.now();
+  await db.transaction('rw', db.recipes, async () => {
+    for (const id of ids) {
+      const r = await db.recipes.get(id);
+      if (r) await db.recipes.update(id, { tags: withCategory(r.tags, cat), updatedAt: now });
+    }
+  });
+}
+
 export const deleteRecipe = (id: string) => db.recipes.update(id, { deleted: true, updatedAt: Date.now() });
 
 /**

@@ -3,7 +3,7 @@
   import { fade, fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
-  import { deleteRecipe, rank, saveRecipe, tokens, type RecipeCheck } from '../lib/recipes';
+  import { CATEGORIES, categoryOf, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
   import { fetchWebRecipe, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
@@ -19,6 +19,8 @@
   type Filter = 'toutes' | 'faisables' | 'presque' | 'favorites';
   let filter = $state<Filter>('toutes');
   let text = $state('');
+  let cat = $state<Category | null>(null);
+  const catCount = (k: Category) => ranked.filter((c) => categoryOf(c.recipe.tags) === k).length;
 
   const feasible = $derived(ranked.filter((c) => c.feasible));
   const almost = $derived(ranked.filter((c) => !c.feasible && c.missing.length <= 2));
@@ -34,7 +36,7 @@
   }
 
   const shown = $derived(
-    (filter === 'faisables' ? feasible : filter === 'presque' ? almost : filter === 'favorites' ? favorites : ranked).filter(found)
+    (filter === 'faisables' ? feasible : filter === 'presque' ? almost : filter === 'favorites' ? favorites : ranked).filter((c) => found(c) && (!cat || categoryOf(c.recipe.tags) === cat))
   );
 
   /* ---------- Sélection : modifier / supprimer / exporter ---------- */
@@ -55,6 +57,17 @@
     if (picked.length !== 1) return;
     editing = picked[0];
     stopSelecting();
+  }
+
+  let categorizing = $state(false);
+  async function categorizePicked(c?: Category) {
+    const n = picked.length;
+    await setCategory(picked.map((r) => r.id), c);
+    categorizing = false;
+    stopSelecting();
+    const label = CATEGORIES.find((x) => x.key === c)?.label;
+    toast = label ? `${n} recette${n > 1 ? 's' : ''} → ${label}` : `Catégorie retirée (${n})`;
+    setTimeout(() => (toast = ''), 3000);
   }
 
   async function deletePicked() {
@@ -198,6 +211,14 @@
   {/if}
 </div>
 
+<div class="filters cats">
+  {#each CATEGORIES as c}
+    <button class="chip" class:sel={cat === c.key} aria-pressed={cat === c.key} onclick={() => (cat = cat === c.key ? null : c.key)}>
+      {c.emoji} {c.label} <span class="n">{catCount(c.key)}</span>
+    </button>
+  {/each}
+</div>
+
 {#if ranked.length}
   <div class="selbar">
     {#if selecting}
@@ -260,6 +281,7 @@
 {#if selecting}
   <div class="actions" transition:fly={{ y: 40, duration: 150 }}>
     <button class="btn ghost" onclick={editPicked} disabled={picked.length !== 1}>✏️ Modifier</button>
+    <button class="btn ghost" onclick={() => (categorizing = true)} disabled={!picked.length}>🏷️ Catégorie</button>
     <button class="btn ghost" onclick={() => (exporting = picked)} disabled={!picked.length}>⬇️ Exporter</button>
     <button class="btn danger" onclick={deletePicked} disabled={!picked.length}>🗑️ Supprimer{picked.length ? ` (${picked.length})` : ''}</button>
   </div>
@@ -326,6 +348,17 @@
   </div>
 {/if}
 
+{#if categorizing}
+  <button class="backdrop" aria-label="Fermer" onclick={() => (categorizing = false)} transition:fade={{ duration: 150 }}></button>
+  <div class="sheet" transition:fly={{ y: 300, duration: 200 }} role="dialog" aria-label="Choisir une catégorie">
+    <h2>Classer {picked.length} recette{picked.length > 1 ? 's' : ''} dans…</h2>
+    {#each CATEGORIES as c}
+      <button class="btn ghost opt" onclick={() => categorizePicked(c.key)}>{c.emoji} {c.label}</button>
+    {/each}
+    <button class="link" onclick={() => categorizePicked()}>Retirer la catégorie</button>
+  </div>
+{/if}
+
 {#if exporting}
   <ExportSheet recipes={exporting} onclose={() => (exporting = null)} />
 {/if}
@@ -354,6 +387,7 @@
     padding: 0 16px 4px;
     scrollbar-width: none;
   }
+  .filters.cats { margin-top: 8px; }
   .filters::-webkit-scrollbar { display: none; }
   .chip {
     flex: none;
@@ -448,7 +482,8 @@
     background: var(--bg);
     box-shadow: 0 2px 12px rgb(0 0 0 / 0.15);
   }
-  .actions .btn { flex: 1; padding-left: 4px; padding-right: 4px; font-size: 14px; }
+  .actions { flex-wrap: wrap; }
+  .actions .btn { flex: 1 1 40%; padding-left: 4px; padding-right: 4px; font-size: 14px; }
   .actions .btn:disabled { opacity: 0.4; }
   .export { display: block; margin: 12px auto 0; color: var(--muted); font-size: 15px; padding: 8px; }
   .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 40; }
@@ -467,6 +502,7 @@
     background: var(--bg);
     z-index: 50;
   }
+  .sheet .link { color: var(--muted); padding: 8px; }
   .sheet h2 { margin: 0 0 4px; font-size: 20px; }
   .opt { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .opt small { font-weight: 400; color: var(--muted); font-size: 13px; }
