@@ -8,6 +8,7 @@
   import { db } from './lib/db';
   import { liveQuery } from 'dexie';
   import { untrack } from 'svelte';
+  import { lastSaved, localChange, onSaved } from './lib/safety';
 
   let { pending = null }: { pending?: Pending | null } = $props();
   let syncOpen = $state(untrack(() => !!pending));
@@ -26,11 +27,17 @@
     history.replaceState(null, '', `#${tab}`);
   });
 
+  let saved = $state(lastSaved());
+  onSaved(() => (saved = lastSaved()));
+  const unsaved = $derived(($localChange ?? 0) > saved);
+
   const toBuy = liveQuery(() => db.shopping.filter((i) => !i.deleted && !i.checked).count());
 </script>
 
 <main>
-  <button class="cloud" aria-label="Synchro" onclick={() => (syncOpen = true)}>☁️</button>
+  <button class="cloud" aria-label={unsaved ? 'Synchro (modifications non sauvegardées)' : 'Synchro'} onclick={() => (syncOpen = true)}>
+    ☁️{#if unsaved}<span class="dot"></span>{/if}
+  </button>
   {#if tab === 'accueil'}
     <Home ongo={(t) => (tab = t)} />
   {:else if tab === 'courses'}
@@ -73,6 +80,16 @@
     font-size: 24px;
     padding: 4px;
     z-index: 5;
+  }
+  .dot {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #f39c12;
+    border: 2px solid var(--bg);
   }
   nav {
     position: fixed;

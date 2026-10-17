@@ -17,6 +17,8 @@
   } from '../lib/drive';
   import { syncWith } from '../lib/sync';
   import { downloadBackup, importBackup } from '../lib/backup';
+  import { lastSaved, listSnapshots, localChange, markSaved, restoreSnapshot, snapshotSize, takeSnapshot } from '../lib/safety';
+  import type { LocalSnapshot } from '../lib/db';
 
   let { pending = null, onclose }: { pending?: Pending | null; onclose: () => void } = $props();
 
@@ -48,6 +50,8 @@
       setState({ fileId });
       const { received } = await syncWith(driveProvider(fileId));
       setState({ lastSync: Date.now(), error: undefined });
+      markSaved();
+      saved = lastSaved();
       message = received ? `Synchronisé · ${received} élément${received > 1 ? 's' : ''} reçu${received > 1 ? 's' : ''}` : 'Synchronisé ✓';
     } catch (e) {
       if (e instanceof NeedAuth) return signIn(action);
@@ -72,6 +76,30 @@
 
   /* ---------- Sauvegarde locale ---------- */
   let backupMsg = $state('');
+  let saved = $state(lastSaved());
+  const unsaved = $derived(($localChange ?? 0) > saved);
+
+  async function download() {
+    await downloadBackup();
+    markSaved(true);
+    saved = lastSaved();
+  }
+
+  /* ---------- Copies automatiques ---------- */
+  let snapshots = $state<LocalSnapshot[]>([]);
+  let showSnapshots = $state(false);
+  const loadSnapshots = async () => (snapshots = await listSnapshots());
+  async function toggleSnapshots() {
+    showSnapshots = !showSnapshots;
+    if (showSnapshots) {
+      await takeSnapshot(true);
+      await loadSnapshots();
+    }
+  }
+  async function restoreCopy(id: number) {
+    const n = await restoreSnapshot(id);
+    backupMsg = n ? `Copie restaurée · ${n} élément${n > 1 ? 's' : ''} repris` : 'Rien à reprendre : tout est déjà là.';
+  }
   async function restore(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -96,6 +124,9 @@
 <button class="backdrop" aria-label="Fermer" onclick={onclose} transition:fade={{ duration: 150 }}></button>
 <div class="sheet" transition:fly={{ y: 300, duration: 200 }}>
   <h2>☁️ Synchro Google Drive</h2>
+  {#if unsaved}
+    <p class="warn">⚠️ Modifications non sauvegardées : synchronise ou télécharge une sauvegarde avant d'effacer les données du navigateur.</p>
+  {/if}
 
   {#if !isConfigured()}
     <p class="muted">Synchro non configurée : identifiant Google absent de cette version.</p>
@@ -135,10 +166,27 @@
   <h3>💾 Sauvegarde</h3>
   <p class="hint">Copie de toutes les données dans un fichier, à garder au cas où. La restauration fusionne : rien n'est effacé.</p>
   <div class="backup">
-    <button class="btn ghost" onclick={downloadBackup}>Télécharger</button>
+    <button class="btn ghost" onclick={download}>Télécharger</button>
     <label class="btn ghost">Restaurer…<input type="file" accept="application/json,.json" onchange={restore} hidden /></label>
   </div>
   {#if backupMsg}<p class="msg">{backupMsg}</p>{/if}
+
+  <button class="link" onclick={toggleSnapshots}>
+    {showSnapshots ? '▾' : '▸'} Copies automatiques sur cet appareil
+  </button>
+  {#if showSnapshots}
+    <p class="hint">Une copie par heure de modifications (10 gardées). Restaurer fusionne : rien n'est effacé. Ne protège pas si les données du navigateur sont effacées.</p>
+    <ul class="snaps">
+      {#each snapshots as s (s.id)}
+        <li>
+          <span>{when(s.id)} · {snapshotSize(s.data)} éléments</span>
+          <button class="btn ghost" onclick={() => restoreCopy(s.id)}>Restaurer</button>
+        </li>
+      {:else}
+        <li class="hint">Aucune copie pour l'instant.</li>
+      {/each}
+    </ul>
+  {/if}
   {#if !isConfigured()}
     <button class="btn ghost" onclick={onclose}>Fermer</button>
   {/if}
@@ -167,10 +215,17 @@
     border-radius: 20px 20px 0 0;
     background: var(--bg);
     z-index: 50;
+    max-height: 90vh;
+    overflow-y: auto;
   }
   .actions { display: flex; justify-content: space-between; }
   h3 { margin: 8px 0 0; font-size: 16px; }
   .backup { display: flex; gap: 8px; }
+  .warn { color: #b9770e; font-size: 14px; font-weight: 600; }
+  .link { background: none; border: 0; padding: 0; text-align: left; color: var(--muted); font-size: 14px; }
+  .snaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 30vh; overflow-y: auto; }
+  .snaps li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+  .snaps .btn { padding: 6px 12px; }
   .backup .btn { flex: 1; text-align: center; }
   .actions .btn.ghost:only-child { margin-left: auto; }
 </style>

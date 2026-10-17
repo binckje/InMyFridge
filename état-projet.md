@@ -128,6 +128,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - **Déclenchement manuel** : icône ☁️ en haut à droite → feuille Synchro (compte, dernière synchro, bouton « Synchroniser maintenant », déconnexion).
 - **Synchro automatique silencieuse** : au démarrage, au retour dans l'app, en la quittant et toutes les 5 min — seulement si le fichier est choisi et la connexion Google encore valide (≤ 1 h). Jamais de redirection imposée ; au-delà d'1 h, synchro manuelle.
 - Données synchronisées : stock, courses, mémoire des rayons, **recettes, produits scannés, emplacements**.
+- **Protection contre la perte** : point orange sur ☁️ (et avertissement dans la feuille) quand des modifications locales sont plus récentes que la dernière synchro ou sauvegarde téléchargée ; alerte du navigateur à la fermeture de l'onglet dans ce cas (pas sur iOS). **Copies automatiques** sur l'appareil (table `snapshots`, non synchronisée) : au plus 1/h s'il y a eu des modifications + en quittant l'app, 10 gardées, restaurables (fusion) dans ☁️ → « Copies automatiques ». Attention : effacer les données du navigateur efface aussi ces copies → seule la synchro Drive ou le fichier téléchargé protègent dans ce cas.
 - **Sauvegarde locale** (feuille ☁️, même sans Google) : « Télécharger » un fichier JSON, « Restaurer » (fusion, rien n'est effacé).
 - **Un seul fichier** `inmyfridge-data.json` dans le dossier « InMyFridge » (plus simple que 1 fichier/appareil avec `drive.file` : l'autre membre n'a besoin de choisir qu'un fichier, une seule fois).
 - Synchro = lire le fichier → fusion **dernière modif gagne par enregistrement** (`updatedAt` ; `lastUsed` pour la mémoire des rayons) → réécrire. Chaque appareil garde tout en local : si deux synchros se croisent, la suivante réintègre ce qui a été écrasé.
@@ -196,9 +197,10 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/lib/recipe-export.ts` | Export PDF, Word, texte, Markdown, JSON ; partage / téléchargement |
 | `src/views/ExportSheet.svelte` | Choix du format d'export |
 | `src/lib/autosync.ts` | Synchro automatique silencieuse |
+| `src/lib/safety.ts` | Détection des modifications non sauvegardées, copies automatiques locales |
 | `tests/*.test.ts` | Tests automatiques (vitest + fake-indexeddb) |
 | `src/lib/types.ts` | Modèle de données (StockItem, ShoppingItem, Recipe, Product, Location…) |
-| `src/lib/db.ts` | Base Dexie v5 (`stock`, `shopping`, `memory`, `recipes`, `products`, `locations`) + stockage persistant |
+| `src/lib/db.ts` | Base Dexie v7 (`stock`, `shopping`, `memory`, `recipes`, `products`, `locations`, `videos`, `snapshots`) + stockage persistant |
 | `src/lib/shopping.ts` | Logique courses (ajout, édition, suggestions, lien stock → courses) |
 | `src/lib/stock.ts` | Logique stock (saisie rapide, −/+, édition, format, conversion d'unités, rangement des courses) |
 | `src/lib/locations.svelte.ts` | Emplacements (état réactif, base, configuration), devinette |
@@ -262,3 +264,4 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
 | 2026-10-15 | Onglet Accueil (par défaut) : accès Stock/Courses/Recettes + ajout rapide stock et courses (texte ou scan). Scanner : 1920×1080, mise au point continue, zoom ×2 par défaut + curseur, lampe, lecture du code-barres sur photo, ZXing TRY_HARDER. |
 | 2026-10-17 | Scan : repli Open Products Facts + Open Beauty Facts pour les produits ménagers / hygiène. |
+| 2026-10-17 | Perte de données après effacement de l'historique : indicateur « non sauvegardé » sur ☁️ + alerte à la fermeture + copies automatiques locales (10). |
