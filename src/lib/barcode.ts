@@ -141,7 +141,7 @@ export async function decodePhoto(file: Blob): Promise<string | null> {
 /* ---------- Fiche produit ---------- */
 
 /** Rayon d'après les catégories Open Food Facts (« en:frozen-foods », « en:dairies »…). */
-export function aisleFromCategories(tags: string[], name: string): string {
+export function aisleFromCategories(tags: string[], name: string, fallback?: string): string {
   const t = tags.join(' ');
   const rules: [RegExp, string][] = [
     [/frozen/, 'surgeles'],
@@ -152,41 +152,55 @@ export function aisleFromCategories(tags: string[], name: string): string {
     [/beverages|waters|juices|sodas|wines|beers/, 'liquides'],
     [/chocolates|biscuits|confectioneries|sweet|breakfast-cereals|jams|honeys|sugars|coffees|teas/, 'epicerie-sucree'],
     [/pastas|rices|canned|sauces|oils|condiments|flours|legumes|snacks|salty|breads|soups/, 'epicerie-salee'],
-    [/household|cleaning|detergents|hygiene/, 'menager']
+    [/household|cleaning|detergents|hygiene|laundry|dishwashing|toilet|paper|cosmetics|shampoos|soaps|toothpastes/, 'menager']
   ];
-  return rules.find(([re]) => re.test(t))?.[1] ?? guessAisle(name);
+  return rules.find(([re]) => re.test(t))?.[1] ?? fallback ?? guessAisle(name);
 }
 
-const API = 'https://world.openfoodfacts.org/api/v2/product';
+/** Bases Open*Facts interrogées dans l'ordre : alimentaire, puis ménager, puis hygiène / beauté. */
+const SOURCES: { api: string; fallbackAisle?: string }[] = [
+  { api: 'https://world.openfoodfacts.org/api/v2/product' },
+  { api: 'https://world.openproductsfacts.org/api/v2/product', fallbackAisle: 'menager' },
+  { api: 'https://world.openbeautyfacts.org/api/v2/product', fallbackAisle: 'menager' }
+];
+const FIELDS = 'product_name_fr,product_name,generic_name_fr,brands,quantity,categories_tags,image_front_small_url';
 
-/** Produit connu localement, sinon Open Food Facts. null = inconnu (ou hors ligne). */
-export async function lookup(code: string): Promise<Product | null> {
-  const known = await db.products.get(code);
-  if (known) return known;
+async function fetchFrom(api: string, code: string) {
   try {
-    const res = await fetch(
-      `${API}/${code}.json?fields=product_name_fr,product_name,generic_name_fr,brands,quantity,categories_tags,image_front_small_url&lc=fr`
-    );
+    const res = await fetch(`${api}/${code}.json?fields=${FIELDS}&lc=fr`);
     if (!res.ok) return null;
     const data = await res.json();
     const p = data?.product;
     if (data?.status !== 1 || !p) return null;
     const name: string = (p.product_name_fr || p.product_name || p.generic_name_fr || '').trim();
-    if (!name) return null;
+    return name ? { p, name } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Produit connu localement, sinon bases Open*Facts. null = inconnu (ou hors ligne). */
+export async function lookup(code: string): Promise<Product | null> {
+  const known = await db.products.get(code);
+  if (known) return known;
+  for (const { api, fallbackAisle } of SOURCES) {
+    const found = await fetchFrom(api, code);
+    if (!found) continue;
+    const { p, name } = found;
     const q = parseStock(`x ${String(p.quantity ?? '').replace(/\s*e$/, '')}`);
+    const tags: string[] = p.categories_tags ?? [];
     return {
       code,
       name,
       brand: String(p.brands ?? '').split(',')[0].trim() || undefined,
       qty: q.qty,
       unit: q.unit,
-      aisleId: aisleFromCategories(p.categories_tags ?? [], name),
+      aisleId: aisleFromCategories(tags, name, fallbackAisle),
       image: p.image_front_small_url,
       updatedAt: Date.now()
     };
-  } catch {
-    return null;
   }
+  return null;
 }
 
 /** Mémorise le produit (avec les corrections de l'utilisateur) pour les prochains scans, même hors ligne. */

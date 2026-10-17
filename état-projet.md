@@ -1,6 +1,6 @@
 # InMyFridge — État du projet
 
-_Dernière mise à jour : 2026-10-15 (travail de nuit)_
+_Dernière mise à jour : 2026-10-17_
 
 ## Statut
 
@@ -96,7 +96,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - Bouton **📷** à droite du champ de saisie (Stock : ranger ; Courses : ajouter à la liste ; remplace ＋ quand le champ est vide).
 - Caméra arrière : `BarcodeDetector` natif (Android/Chrome), sinon **ZXing** chargé à la demande (iPhone). Chiffre de contrôle EAN vérifié. Saisie manuelle du code possible.
-- **Open Food Facts** : nom, marque, contenance, photo ; rayon/emplacement devinés d'après les catégories. Fiche modifiable : nom, contenance × nombre (« 400 g » × 2 → 800 g), emplacement.
+- **Open Food Facts**, puis en repli **Open Products Facts** (ménager) et **Open Beauty Facts** (hygiène) : nom, marque, contenance, photo ; rayon/emplacement devinés d'après les catégories (« Produits ménagers » par défaut pour les 2 bases non alimentaires). Fiche modifiable : nom, contenance × nombre (« 400 g » × 2 → 800 g), emplacement.
 - Produits mémorisés (table `products`, synchronisée) : reconnus **hors ligne** et avec tes corrections.
 - **Photo de l'emballage (OCR)** : Tesseract.js dans le navigateur, sans service en ligne. Moteur + données « français » (~4,6 Mo) servis par l'app et mis en cache à la première utilisation. Propose les textes lus (le plus gros d'abord = nom probable) et la contenance (« 500 g »).
 - Ajouts en série : après « Ranger », retour au scan pour le produit suivant.
@@ -187,7 +187,7 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/views/RestockSheet.svelte` | Ranger les courses dans le stock |
 | `src/views/LocationsSheet.svelte` | Configuration des emplacements |
 | `src/lib/recipes.ts` | Lecture des ingrédients, comparaison au stock, cuisiner, recettes de base |
-| `src/lib/recipes-seed.ts` | Les 30 recettes de base |
+| `src/lib/recipes-seed.ts` | Les 31 recettes de base |
 | `src/lib/web-recipes.ts` | TheMealDB + traduction des ingrédients |
 | `src/lib/barcode.ts` | Caméra (BarcodeDetector / ZXing), Open Food Facts, mémoire produits |
 | `src/lib/ocr.ts` | Tesseract.js, suggestions de nom et contenance |
@@ -261,3 +261,4 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-15 | Import de recettes (pdf via pdf.js, docx via fflate, rtf, txt, json, photo) en fiche normalisée vérifiée avant enregistrement ; export PDF (jsPDF), Word, texte, Markdown, JSON. |
 | 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
 | 2026-10-15 | Onglet Accueil (par défaut) : accès Stock/Courses/Recettes + ajout rapide stock et courses (texte ou scan). Scanner : 1920×1080, mise au point continue, zoom ×2 par défaut + curseur, lampe, lecture du code-barres sur photo, ZXing TRY_HARDER. |
+| 2026-10-17 | Scan : repli Open Products Facts + Open Beauty Facts pour les produits ménagers / hygiène. |
