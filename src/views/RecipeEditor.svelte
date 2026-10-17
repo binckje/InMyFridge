@@ -124,7 +124,7 @@
     onclose();
   }
 
-  const EMOJIS = [...new Set([form.emoji, '🍽️', '🥗', '🍲', '🍝', '🍕', '🥘', '🍛', '🍗', '🐟', '🥩', '🥚', '🧀', '🥧', '🍰', '🍫', '🍪', '🥞', '🍎'])];
+  const EMOJIS = [...new Set([form.emoji, '🍽️', '🥗', '🍲', '🍝', '🍕', '🥘', '🍛', '🍗', '🐟', '🥩', '🥚', '🧀', '🥧', '🍰', '🍜', '🍫', '🍪', '🥞', '🍎'])];
 </script>
 
 <button class="backdrop" aria-label="Fermer" onclick={() => onclose()} transition:fade={{ duration: 150 }}></button>
