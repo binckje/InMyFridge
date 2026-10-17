@@ -1,5 +1,6 @@
 import { driveProvider, getState, hasToken, isConfigured, setState } from './drive';
 import { syncWith } from './sync';
+import { markSaved } from './safety';
 
 /**
  * Synchro silencieuse quand c'est possible sans action de l'utilisateur :
@@ -14,6 +15,7 @@ export async function autoSync(): Promise<boolean> {
   try {
     await syncWith(driveProvider(fileId));
     setState({ lastSync: Date.now(), error: undefined });
+    markSaved();
     return true;
   } catch {
     return false;

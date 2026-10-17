@@ -47,6 +47,20 @@ describe('lookup', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('produit ménager : repli sur Open Products Facts', async () => {
+    const fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('openproductsfacts')
+          ? { status: 1, product: { product_name: 'Lessive liquide', quantity: '2 l', categories_tags: [] } }
+          : { status: 0 }
+    }));
+    vi.stubGlobal('fetch', fetch);
+    const p = await lookup('3017620429999');
+    expect(p).toMatchObject({ name: 'Lessive liquide', qty: 2, unit: 'l', aisleId: 'menager' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('inconnu ou hors ligne → null', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 0 }) })));
     expect(await lookup('96385074')).toBeNull();

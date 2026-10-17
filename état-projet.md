@@ -1,6 +1,6 @@
 # InMyFridge — État du projet
 
-_Dernière mise à jour : 2026-10-15 (travail de nuit)_
+_Dernière mise à jour : 2026-10-17_
 
 ## Statut
 
@@ -96,7 +96,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 - Bouton **📷** à droite du champ de saisie (Stock : ranger ; Courses : ajouter à la liste ; remplace ＋ quand le champ est vide).
 - Caméra arrière : `BarcodeDetector` natif (Android/Chrome), sinon **ZXing** chargé à la demande (iPhone). Chiffre de contrôle EAN vérifié. Saisie manuelle du code possible.
-- **Open Food Facts** : nom, marque, contenance, photo ; rayon/emplacement devinés d'après les catégories. Fiche modifiable : nom, contenance × nombre (« 400 g » × 2 → 800 g), emplacement.
+- **Open Food Facts**, puis en repli **Open Products Facts** (ménager) et **Open Beauty Facts** (hygiène) : nom, marque, contenance, photo ; rayon/emplacement devinés d'après les catégories (« Produits ménagers » par défaut pour les 2 bases non alimentaires). Fiche modifiable : nom, contenance × nombre (« 400 g » × 2 → 800 g), emplacement.
 - Produits mémorisés (table `products`, synchronisée) : reconnus **hors ligne** et avec tes corrections.
 - **Photo de l'emballage (OCR)** : Tesseract.js dans le navigateur, sans service en ligne. Moteur + données « français » (~4,6 Mo) servis par l'app et mis en cache à la première utilisation. Propose les textes lus (le plus gros d'abord = nom probable) et la contenance (« 500 g »).
 - Ajouts en série : après « Ranger », retour au scan pour le produit suivant.
@@ -128,6 +128,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - **Déclenchement manuel** : icône ☁️ en haut à droite → feuille Synchro (compte, dernière synchro, bouton « Synchroniser maintenant », déconnexion).
 - **Synchro automatique silencieuse** : au démarrage, au retour dans l'app, en la quittant et toutes les 5 min — seulement si le fichier est choisi et la connexion Google encore valide (≤ 1 h). Jamais de redirection imposée ; au-delà d'1 h, synchro manuelle.
 - Données synchronisées : stock, courses, mémoire des rayons, **recettes, produits scannés, emplacements**.
+- **Protection contre la perte** : point orange sur ☁️ (et avertissement dans la feuille) quand des modifications locales sont plus récentes que la dernière synchro ou sauvegarde téléchargée ; alerte du navigateur à la fermeture de l'onglet dans ce cas (pas sur iOS). **Copies automatiques** sur l'appareil (table `snapshots`, non synchronisée) : au plus 1/h s'il y a eu des modifications + en quittant l'app, 10 gardées, restaurables (fusion) dans ☁️ → « Copies automatiques ». Attention : effacer les données du navigateur efface aussi ces copies → seule la synchro Drive ou le fichier téléchargé protègent dans ce cas.
 - **Sauvegarde locale** (feuille ☁️, même sans Google) : « Télécharger » un fichier JSON, « Restaurer » (fusion, rien n'est effacé).
 - **Un seul fichier** `inmyfridge-data.json` dans le dossier « InMyFridge » (plus simple que 1 fichier/appareil avec `drive.file` : l'autre membre n'a besoin de choisir qu'un fichier, une seule fois).
 - Synchro = lire le fichier → fusion **dernière modif gagne par enregistrement** (`updatedAt` ; `lastUsed` pour la mémoire des rayons) → réécrire. Chaque appareil garde tout en local : si deux synchros se croisent, la suivante réintègre ce qui a été écrasé.
@@ -187,7 +188,7 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/views/RestockSheet.svelte` | Ranger les courses dans le stock |
 | `src/views/LocationsSheet.svelte` | Configuration des emplacements |
 | `src/lib/recipes.ts` | Lecture des ingrédients, comparaison au stock, cuisiner, recettes de base |
-| `src/lib/recipes-seed.ts` | Les 30 recettes de base |
+| `src/lib/recipes-seed.ts` | Les 31 recettes de base |
 | `src/lib/web-recipes.ts` | TheMealDB + traduction des ingrédients |
 | `src/lib/barcode.ts` | Caméra (BarcodeDetector / ZXing), Open Food Facts, mémoire produits |
 | `src/lib/ocr.ts` | Tesseract.js, suggestions de nom et contenance |
@@ -196,9 +197,10 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/lib/recipe-export.ts` | Export PDF, Word, texte, Markdown, JSON ; partage / téléchargement |
 | `src/views/ExportSheet.svelte` | Choix du format d'export |
 | `src/lib/autosync.ts` | Synchro automatique silencieuse |
+| `src/lib/safety.ts` | Détection des modifications non sauvegardées, copies automatiques locales |
 | `tests/*.test.ts` | Tests automatiques (vitest + fake-indexeddb) |
 | `src/lib/types.ts` | Modèle de données (StockItem, ShoppingItem, Recipe, Product, Location…) |
-| `src/lib/db.ts` | Base Dexie v5 (`stock`, `shopping`, `memory`, `recipes`, `products`, `locations`) + stockage persistant |
+| `src/lib/db.ts` | Base Dexie v7 (`stock`, `shopping`, `memory`, `recipes`, `products`, `locations`, `videos`, `snapshots`) + stockage persistant |
 | `src/lib/shopping.ts` | Logique courses (ajout, édition, suggestions, lien stock → courses) |
 | `src/lib/stock.ts` | Logique stock (saisie rapide, −/+, édition, format, conversion d'unités, rangement des courses) |
 | `src/lib/locations.svelte.ts` | Emplacements (état réactif, base, configuration), devinette |
@@ -261,3 +263,5 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-15 | Import de recettes (pdf via pdf.js, docx via fflate, rtf, txt, json, photo) en fiche normalisée vérifiée avant enregistrement ; export PDF (jsPDF), Word, texte, Markdown, JSON. |
 | 2026-10-15 | Recettes en pièces (`yieldUnit`, ex. 20 cookies) + recette de base Cookies. |
 | 2026-10-15 | Onglet Accueil (par défaut) : accès Stock/Courses/Recettes + ajout rapide stock et courses (texte ou scan). Scanner : 1920×1080, mise au point continue, zoom ×2 par défaut + curseur, lampe, lecture du code-barres sur photo, ZXing TRY_HARDER. |
+| 2026-10-17 | Scan : repli Open Products Facts + Open Beauty Facts pour les produits ménagers / hygiène. |
+| 2026-10-17 | Perte de données après effacement de l'historique : indicateur « non sauvegardé » sur ☁️ + alerte à la fermeture + copies automatiques locales (10). |
