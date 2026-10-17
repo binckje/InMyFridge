@@ -80,37 +80,98 @@ const KIND_OF: Record<string, string[]> = {
 const IGNORED = new Set(['ble', 'poudre']);
 
 /**
+ * Précisions de l'ingrédient qui n'empêchent pas d'utiliser le produit du stock
+ * (« sauce soja légère » → sauce de soja, « vinaigre noir chinois » → vinaigre noir).
+ */
+const QUALIFIERS = new Set(
+  (
+    'léger légère doux douce frais fraîche entier entière bio nature fin fine extra épais épaisse râpé râpée ' +
+    'gros grosse moyen moyenne demi écrémé écrémée allégé allégée maison surgelé surgelée nouveau nouvelle pur ' +
+    'vierge chinois japonais italien italienne français française'
+  )
+    .split(' ')
+    .map(base)
+);
+
+/**
  * Variantes interchangeables en cuisine : si seuls ces mots diffèrent, le produit du stock
- * peut remplacer l'ingrédient (sucre roux ⇄ cassonade ⇄ sucre, farine T45 ⇄ farine T55…).
+ * peut remplacer l'ingrédient (farine T45 ⇄ farine T55…).
  */
 const VARIANTS: Record<string, Set<string>> = {
-  sucre: new Set(['rou' /* roux, après singulier */, 'blanc', 'semoule', 'glace', 'cassonade', 'vergeoise', 'complet', 'canne', 'blond', 'brun', 'cristal']),
   farine: new Set(['t45', 't55', 't65', 't80', 't110', 't150', 'fluide', 'complete', 'patissiere', 'gateau', 'pain'])
 };
 
-/** Mots de l'ingrédient, avec le nom générique d'une variante (« cassonade » → sucre + cassonade). */
-const ingWords = (name: string) =>
-  [...new Set(tokens(name).filter((w) => !IGNORED.has(w)).flatMap((w) => [...(KIND_OF[w] ?? []).filter((k) => VARIANTS[k]), w]))];
+/**
+ * Familles d'un produit : même famille = même produit (cassonade ⇄ sucre roux) ;
+ * famille différente = simple suggestion (sucre roux demandé, sucre blanc en stock). Sans précision : la première.
+ */
+const FAMILIES: Record<string, Record<string, string>> = {
+  sucre: {
+    blanc: 'blanc', semoule: 'blanc', cristal: 'blanc',
+    rou: 'roux', cassonade: 'roux', vergeoise: 'roux', brun: 'roux', blond: 'roux', complet: 'roux', canne: 'roux',
+    glace: 'glace'
+  }
+};
 
-export type MatchKind = 'exact' | 'substitute';
+/** Mots de l'ingrédient, avec le nom générique d'une variante (« cassonade » → sucre + cassonade). */
+function ingWords(name: string) {
+  const all = tokens(name).filter((w) => !IGNORED.has(w));
+  const kept = all.filter((w) => !QUALIFIERS.has(w));
+  const words = kept.length ? kept : all;
+  return [...new Set(words.flatMap((w) => [...(KIND_OF[w] ?? []).filter((k) => VARIANTS[k] || FAMILIES[k]), w]))];
+}
+
+/** Famille du produit (premier mot de famille trouvé, sinon la famille par défaut). */
+const familyOf = (words: Iterable<string>, fam: Record<string, string>, fallback?: string) => {
+  for (const w of words) if (fam[w]) return fam[w];
+  return fallback;
+};
 
 /**
- * Correspondance produit du stock ↔ ingrédient :
- * exact = tous les mots de l'ingrédient figurent dans le produit ;
- * substitute = même produit de base, seule la variante diffère (sucre roux demandé, sucre en stock).
+ * exact = même produit ; substitute = variante interchangeable (compté disponible, signalé) ;
+ * close = produit voisin (même nom principal), proposé en suggestion seulement.
+ */
+export type MatchKind = 'exact' | 'substitute' | 'close';
+
+const RANK: Record<MatchKind, number> = { exact: 3, substitute: 2, close: 1 };
+
+function matchOne(ingredient: string, st: Set<string>): MatchKind | undefined {
+  let ing = ingWords(ingredient);
+  if (!ing.length) return undefined;
+  const head = ing[0];
+  let otherFamily = false;
+  for (const [name, fam] of Object.entries(FAMILIES)) {
+    if (!ing.includes(name) || !st.has(name)) continue;
+    const wanted = familyOf(ing, fam);
+    otherFamily ||= !!wanted && wanted !== familyOf(st, fam, Object.values(fam)[0]);
+    ing = ing.filter((w) => !fam[w]);
+  }
+  const miss = ing.filter((w) => !st.has(w));
+  if (!miss.length) return otherFamily ? 'close' : 'exact';
+  const v = ing.find((w) => VARIANTS[w] && st.has(w));
+  if (v && miss.every((w) => VARIANTS[v].has(w))) return 'substitute';
+  return st.has(head) ? 'close' : undefined;
+}
+
+/**
+ * Correspondance produit du stock ↔ ingrédient (le meilleur des choix « maïzena / fécule de maïs ») :
+ * exact = tous les mots de l'ingrédient (hors précisions) figurent dans le produit.
  */
 export function matchKind(ingredient: string, stockName: string): MatchKind | undefined {
-  const ing = ingWords(ingredient);
   const st = new Set(tokens(stockName).flatMap((w) => [w, ...(KIND_OF[w] ?? [])]));
-  if (!ing.length) return undefined;
-  const miss = ing.filter((w) => !st.has(w));
-  if (!miss.length) return 'exact';
-  const head = ing.find((w) => VARIANTS[w] && st.has(w));
-  return head && miss.every((w) => VARIANTS[head].has(w)) ? 'substitute' : undefined;
+  let best: MatchKind | undefined;
+  for (const alt of ingredient.split(/\s*\/\s*|\s+ou\s+/i)) {
+    const k = matchOne(alt, st);
+    if (k && (!best || RANK[k] > RANK[best])) best = k;
+  }
+  return best;
 }
 
 /** Le produit du stock peut servir pour l'ingrédient (exactement ou en remplacement). */
-export const matches = (ingredient: string, stockName: string): boolean => !!matchKind(ingredient, stockName);
+export const matches = (ingredient: string, stockName: string): boolean => {
+  const k = matchKind(ingredient, stockName);
+  return k === 'exact' || k === 'substitute';
+};
 
 /** Toujours considérés comme disponibles. */
 const BASICS = new Set(['sel', 'poivre', 'eau', 'sel poivre']);
@@ -200,8 +261,10 @@ export interface IngredientCheck {
   status: Status;
   /** Produits utilisables, le meilleur d'abord (correspondance exacte, puis le plus de stock). */
   stock: StockItem[];
-  /** Le meilleur produit n'est qu'un remplacement (sucre en stock pour du sucre roux). */
+  /** Le meilleur produit n'est qu'un remplacement (farine T45 en stock pour de la farine T55). */
   substitute?: boolean;
+  /** Ingrédient manquant : produits voisins en stock, proposés en suggestion (sucre roux pour du sucre blanc). */
+  close?: StockItem[];
 }
 
 export interface RecipeCheck {
@@ -214,15 +277,22 @@ export interface RecipeCheck {
   score: number;
 }
 
-export function checkIngredient(ing: RecipeIngredient, stock: StockItem[], scale = 1): IngredientCheck {
+/** useClose : l'utilisateur accepte les produits voisins (suggestions) pour cet ingrédient. */
+export function checkIngredient(ing: RecipeIngredient, stock: StockItem[], scale = 1, useClose = false): IngredientCheck {
   if (isBasic(ing.name)) return { ingredient: ing, status: 'basic', stock: [] };
   const kind = new Map<StockItem, MatchKind>();
+  const close: StockItem[] = [];
   for (const s of stock) {
-    const k = !s.deleted && matchKind(ing.name, s.name);
+    let k = !s.deleted && matchKind(ing.name, s.name);
+    if (k === 'close') {
+      if ((s.level ? true : (s.qty ?? 0) > 0)) close.push(s);
+      if (!useClose) continue;
+      k = 'substitute';
+    }
     if (k) kind.set(s, k);
   }
   const found = [...kind.keys()];
-  if (!found.length) return { ingredient: ing, status: 'missing', stock: [] };
+  if (!found.length) return { ingredient: ing, status: 'missing', stock: [], close: close.length ? close : undefined };
   const present = found
     .filter((s) => (s.level ? true : (s.qty ?? 0) > 0))
     .sort((a, b) => +(kind.get(a) !== 'exact') - +(kind.get(b) !== 'exact') || amountOf(b) - amountOf(a));
@@ -256,8 +326,9 @@ export function qtyLabel(i: RecipeIngredient, scale = 1): string {
   return !i.unit || i.unit === 'pièce' ? n : `${n} ${i.unit}`;
 }
 
-export function checkRecipe(recipe: Recipe, stock: StockItem[], scale = 1): RecipeCheck {
-  const checks = recipe.ingredients.map((i) => checkIngredient(i, stock, scale));
+/** useClose : index des ingrédients pour lesquels l'utilisateur accepte un produit voisin. */
+export function checkRecipe(recipe: Recipe, stock: StockItem[], scale = 1, useClose: ReadonlySet<number> = new Set()): RecipeCheck {
+  const checks = recipe.ingredients.map((i, n) => checkIngredient(i, stock, scale, useClose.has(n)));
   const counted = checks.filter((c) => !c.ingredient.optional && c.status !== 'basic');
   const missing = counted.filter((c) => c.status === 'missing' || c.status === 'low');
   const have = counted.filter((c) => c.status === 'ok').length;

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/lib/db';
 import { addStock } from '../src/lib/stock';
 import {
+  checkIngredient,
   addMissingToShopping,
   categoryOf,
   setCategory,
@@ -17,6 +18,7 @@ import {
   yieldLabel
 } from '../src/lib/recipes';
 import { SEED_RECIPES } from '../src/lib/recipes-seed';
+import type { StockItem } from '../src/lib/types';
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()));
@@ -123,14 +125,19 @@ describe('checkRecipe / cook', () => {
   });
 
   it('variantes : remplacement signalé, cuillères converties, choix du produit', async () => {
-    expect(matchKind('sucre roux', 'sucre')).toBe('substitute');
+    expect(matchKind('sucre roux', 'sucre')).toBe('close');
     expect(matchKind('sucre roux', 'cassonade')).toBe('exact');
-    expect(matchKind('cassonade', 'sucre roux')).toBe('substitute');
+    expect(matchKind('cassonade', 'sucre roux')).toBe('exact');
+    expect(matchKind('sucre blanc', 'cassonade')).toBe('close');
+    expect(matchKind('sucre en poudre', 'sucre semoule')).toBe('exact');
     expect(matchKind('sucre', 'cassonade')).toBe('exact');
     expect(matchKind('farine de blé', 'farine')).toBe('exact');
     expect(matchKind('farine T55', 'farine T45')).toBe('substitute');
     expect(matchKind('sucre vanillé', 'sucre')).toBeUndefined();
     expect(matchKind('pomme', 'pomme de terre')).toBeUndefined();
+    expect(matchKind('huile d’olive', 'huile de tournesol')).toBe('close');
+    expect(matchKind('vin blanc', 'vin rouge')).toBe('close');
+
     expect(parseIngredient('2 cuillères à soupe de sucre roux')).toEqual({ name: 'sucre roux', qty: 2, unit: 'cuillères à soupe' });
 
     const white = (await addStock('sucre 1 kg', 'placard'))!;
@@ -138,7 +145,9 @@ describe('checkRecipe / cook', () => {
     const oil = (await addStock('huile 1 l', 'placard'))!;
     const r = { id: 'x', name: 'x', servings: 1, steps: [], source: 'perso' as const, createdAt: 0, updatedAt: 0,
       ingredients: [parseIngredient('2 c. à s. de sucre roux'), parseIngredient('1 c. à c. d\'huile')] };
-    const c = checkRecipe(r, await db.stock.toArray());
+    // sucre blanc : simple suggestion, sauf si l'utilisateur l'accepte (💡 Utiliser)
+    expect(checkRecipe(r, await db.stock.toArray()).checks[0].stock.map((s) => s.id)).toEqual([brown.id]);
+    const c = checkRecipe(r, await db.stock.toArray(), 1, new Set([0]));
     // cassonade : bonne variante mais 30 g, le sucre blanc complète (24 g demandés)
     expect(c.checks[0].stock.map((s) => s.id)).toEqual([brown.id, white.id]);
     expect(c.checks[0].substitute).toBeUndefined();
@@ -152,6 +161,19 @@ describe('checkRecipe / cook', () => {
     await addMissingToShopping(checkRecipe(r, []));
     const list = (await db.shopping.toArray()).map((i) => `${i.name}:${i.qty ?? ''}`).sort();
     expect(list).toEqual(['huile:1 c. à c.', 'sucre roux:2 c. à s.']);
+  });
+
+  it('précisions ignorées et choix « / » ou « ou »', () => {
+    expect(matchKind('maïzena / fécule de maïs', 'Maizena Fleur de Maïs')).toBe('exact');
+    expect(matchKind('fécule de maïs ou maïzena', 'Maïzena')).toBe('exact');
+    expect(matchKind('sauce soja légère', 'Sauce de soja')).toBe('exact');
+    expect(matchKind('Vinaigre noir chinois', 'Vinaigre Noir')).toBe('exact');
+    expect(matchKind('beurre doux', 'beurre')).toBe('exact');
+    expect(matchKind('vinaigre noir', 'vinaigre balsamique')).toBe('close');
+    const brown = { id: 'b', name: 'cassonade', qty: 500, unit: 'g' } as StockItem;
+    const miss = checkIngredient(parseIngredient('100 g sucre blanc'), [brown]);
+    expect(miss).toMatchObject({ status: 'missing', close: [brown] });
+    expect(checkIngredient(parseIngredient('100 g sucre blanc'), [brown], 1, true)).toMatchObject({ status: 'ok', substitute: true });
   });
 
   it('seed idempotent, recette supprimée non réinstallée', async () => {
