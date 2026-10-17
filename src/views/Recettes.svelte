@@ -2,6 +2,7 @@
   import { liveQuery } from 'dexie';
   import { fade, fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
+  import { thumb } from '../lib/media';
   import { db } from '../lib/db';
   import { CATEGORIES, categoryOf, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
   import { fetchWebRecipe, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
@@ -259,7 +260,7 @@
         onclick={() => (selecting ? toggle(c.recipe.id) : (openId = c.recipe.id))}
       >
         {#if selecting}<span class="check" aria-hidden="true">{selected.has(c.recipe.id) ? '✓' : ''}</span>{/if}
-        {#if c.recipe.image}<img src="{c.recipe.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">{c.recipe.emoji ?? '🍽️'}</span>{/if}
+        {#if c.recipe.image}<img src={thumb(c.recipe.image)} alt="" loading="lazy" />{:else}<span class="emoji">{c.recipe.emoji ?? '🍽️'}</span>{/if}
         <span class="body">
           <span class="name">{c.recipe.name}</span>
           <span class="meta">

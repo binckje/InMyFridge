@@ -43,8 +43,9 @@ describe('parseRecipeText', () => {
     expect(findServings('Portions : 8')).toBe(8);
     expect(findTime('Temps total : 1 h 15')).toBe(75);
     expect(findTime('Préparation : 15 min · Cuisson : 1 h')).toBe(75);
-    expect(findTimes('Préparation : 15 min · Cuisson : 1 h')).toEqual({ prepTime: 15, cookTime: 60 });
-    expect(findTimes('Temps total : 30 min')).toEqual({ prepTime: undefined, cookTime: undefined });
+    expect(findTimes('Préparation : 15 min · Cuisson : 1 h')).toEqual({ prepTime: 15, cookTime: 60, restTime: undefined });
+    expect(findTimes('Préparation : 10 min, repos : 2 h').restTime).toBe(120);
+    expect(findTimes('Temps total : 30 min')).toEqual({ prepTime: undefined, cookTime: undefined, restTime: undefined });
   });
 });
 
@@ -77,5 +78,14 @@ Fa\u238?tes chauffer\par}`;
   it('json exporté par l’app', () => {
     const list = parseRecipeJson(JSON.stringify({ recipes: [{ name: 'X', ingredients: [{ name: 'ail' }], source: 'base' }] }));
     expect(list).toEqual([{ name: 'X', emoji: undefined, servings: 4, time: undefined, tags: [], ingredients: [{ name: 'ail' }], steps: [], rating: undefined, url: undefined, image: undefined, source: 'perso' }]);
+  });
+});
+
+describe('vidéo', async () => {
+  const { embedUrl } = await import('../src/lib/media');
+  it('lien YouTube intégrable, autre lien non', () => {
+    expect(embedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    expect(embedUrl('https://youtu.be/dQw4w9WgXcQ')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    expect(embedUrl('https://vimeo.com/123')).toBeUndefined();
   });
 });

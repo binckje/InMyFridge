@@ -10,6 +10,14 @@ export interface Memory {
   lastUsed: number;
 }
 
+/** Vidéo d'une recette copiée sur l'appareil (clé = id de la recette). Non synchronisée. */
+export interface RecipeVideo {
+  id: string;
+  blob: Blob;
+  name: string;
+  type: string;
+}
+
 export const db = new Dexie('inmyfridge') as Dexie & {
   stock: EntityTable<StockItem, 'id'>;
   shopping: EntityTable<ShoppingItem, 'id'>;
@@ -17,6 +25,7 @@ export const db = new Dexie('inmyfridge') as Dexie & {
   recipes: EntityTable<Recipe, 'id'>;
   products: EntityTable<Product, 'code'>;
   locations: EntityTable<StoredLocation, 'id'>;
+  videos: EntityTable<RecipeVideo, 'id'>;
 };
 
 db.version(1).stores({
@@ -39,6 +48,7 @@ db.version(2)
 db.version(3).stores({ recipes: 'id, updatedAt' });
 db.version(4).stores({ products: 'code, updatedAt' });
 db.version(5).stores({ locations: 'id, order, updatedAt' });
+db.version(6).stores({ videos: 'id' });
 
 export const newId = () => crypto.randomUUID();
 

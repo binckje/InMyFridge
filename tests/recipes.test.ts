@@ -10,6 +10,7 @@ import {
   cook,
   formatIngredient,
   matches,
+  matchKind,
   parseIngredient,
   seedRecipes,
   undoCook,
@@ -119,6 +120,38 @@ describe('checkRecipe / cook', () => {
     expect(n).toBe(4);
     const list = (await db.shopping.toArray()).map((i) => `${i.name}:${i.qty ?? ''}`).sort();
     expect(list).toEqual(['beurre:50 g', 'farine:250 g', 'lait:500 ml', 'oeufs:4']);
+  });
+
+  it('variantes : remplacement signalé, cuillères converties, choix du produit', async () => {
+    expect(matchKind('sucre roux', 'sucre')).toBe('substitute');
+    expect(matchKind('sucre roux', 'cassonade')).toBe('exact');
+    expect(matchKind('cassonade', 'sucre roux')).toBe('substitute');
+    expect(matchKind('sucre', 'cassonade')).toBe('exact');
+    expect(matchKind('farine de blé', 'farine')).toBe('exact');
+    expect(matchKind('farine T55', 'farine T45')).toBe('substitute');
+    expect(matchKind('sucre vanillé', 'sucre')).toBeUndefined();
+    expect(matchKind('pomme', 'pomme de terre')).toBeUndefined();
+    expect(parseIngredient('2 cuillères à soupe de sucre roux')).toEqual({ name: 'sucre roux', qty: 2, unit: 'cuillères à soupe' });
+
+    const white = (await addStock('sucre 1 kg', 'placard'))!;
+    const brown = (await addStock('cassonade 30 g', 'placard'))!;
+    const oil = (await addStock('huile 1 l', 'placard'))!;
+    const r = { id: 'x', name: 'x', servings: 1, steps: [], source: 'perso' as const, createdAt: 0, updatedAt: 0,
+      ingredients: [parseIngredient('2 c. à s. de sucre roux'), parseIngredient('1 c. à c. d\'huile')] };
+    const c = checkRecipe(r, await db.stock.toArray());
+    // cassonade : bonne variante mais 30 g, le sucre blanc complète (24 g demandés)
+    expect(c.checks[0].stock.map((s) => s.id)).toEqual([brown.id, white.id]);
+    expect(c.checks[0].substitute).toBeUndefined();
+    expect(c.feasible).toBe(true);
+    await cook(c, 1, { 0: white.id });
+    expect((await db.stock.get(white.id))?.qty).toBe(0.976);
+    expect((await db.stock.get(brown.id))?.qty).toBe(30);
+    expect((await db.stock.get(oil.id))?.qty).toBe(0.995);
+    expect(checkRecipe(r, await db.stock.toArray(), 100).checks[0].status).toBe('low');
+
+    await addMissingToShopping(checkRecipe(r, []));
+    const list = (await db.shopping.toArray()).map((i) => `${i.name}:${i.qty ?? ''}`).sort();
+    expect(list).toEqual(['huile:1 c. à c.', 'sucre roux:2 c. à s.']);
   });
 
   it('seed idempotent, recette supprimée non réinstallée', async () => {
