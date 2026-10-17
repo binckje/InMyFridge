@@ -39,7 +39,9 @@
   const scale = $derived(servings / recipe.servings);
   /** Pas du −/+ : 1 personne, ou ~10 % de la fournée (20 cookies → 2 par 2). */
   const step = $derived(recipe.yieldUnit ? Math.max(1, Math.round(recipe.servings / 10)) : 1);
-  const check = $derived(checkRecipe(recipe, stock, scale));
+  /** Ingrédients pour lesquels on accepte le produit voisin suggéré (💡 Utiliser). */
+  let useClose = $state(new Set<number>());
+  const check = $derived(checkRecipe(recipe, stock, scale, useClose));
   /** Produit choisi pour chaque ingrédient (index → id du stock) quand plusieurs conviennent. */
   let choice = $state<Record<number, string>>({});
   const chosen = (n: number) => check.checks[n].stock.find((s) => s.id === choice[n]) ?? check.checks[n].stock[0];
@@ -141,8 +143,14 @@
             {#each c.stock as s}<option value={s.id}>{s.name}</option>{/each}
           </select>
         {/if}
-        {#if c.status !== 'basic' && c.stock.length && matchKind(c.ingredient.name, chosen(n).name) === 'substitute'}
+        {#if c.status !== 'basic' && c.stock.length && matchKind(c.ingredient.name, chosen(n).name) !== 'exact'}
           <span class="sub">⚠️ remplacé par « {chosen(n).name} »</span>
+        {/if}
+        {#if c.close && !useClose.has(n)}
+          <span class="close">
+            💡 Tu as : {c.close.map((s) => s.name).join(', ')}
+            <button class="use" onclick={() => (useClose = new Set(useClose).add(n))}>Utiliser</button>
+          </span>
         {/if}
       </li>
     {/each}
@@ -238,6 +246,8 @@
   .servings button:disabled { opacity: 0.4; }
   .pick { flex-basis: 100%; margin: 4px 0 0 28px; max-width: calc(100% - 28px); font-size: 14px; }
   .sub { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--amber); }
+  .close { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .use { font-size: 13px; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--muted); background: none; color: inherit; }
   .tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
 
   .verdict { margin: 10px 0; font-weight: 600; }
