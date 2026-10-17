@@ -147,7 +147,7 @@
           <span class="sub">⚠️ remplacé par « {chosen(n).name} »</span>
         {/if}
         {#if c.close && !useClose.has(n)}
-          <span class="close">
+          <span class="near">
             💡 Tu as : {c.close.map((s) => s.name).join(', ')}
             <button class="use" onclick={() => (useClose = new Set(useClose).add(n))}>Utiliser</button>
           </span>
@@ -246,7 +246,7 @@
   .servings button:disabled { opacity: 0.4; }
   .pick { flex-basis: 100%; margin: 4px 0 0 28px; max-width: calc(100% - 28px); font-size: 14px; }
   .sub { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--amber); }
-  .close { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .near { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .use { font-size: 13px; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--muted); background: none; color: inherit; }
   .tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
 
