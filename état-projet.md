@@ -71,6 +71,8 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - Produit déjà présent au même endroit : quantités additionnées (même unité), sinon remplacées.
 - **Boutons − / +** : pièce ±1, g/ml ±100, cl ±10, kg/l ±0,25 ; niveau : niveau précédent / suivant (couleur rouge/orange/vert).
 - **Tap sur le nom** → feuille : nom, emplacement, catégorie, mode Quantité (valeur + unité + seuil) ou Niveau (niveau + seuil), suppression annulable 4 s.
+- **Tap sur la quantité** → saisie directe (Entrée valide, Échap annule).
+- **Lots** (plaquette, bouteille… nom libre) pour les produits en g/kg/ml/cl/l : `packs` = contenu restant de chaque lot (ex. `[250, 250, 500]`), `qty` = somme. Ajout « 2x250g beurre » ; un ajout du même produit en même unité forme un nouveau lot. − retire le plus petit lot (l'entamé), + ajoute un lot de la contenance habituelle (`packSize`) ; saisie directe / « J'ai cuisiné » puisent dans le plus petit lot d'abord. Fiche : case « Par lots », nom, contenance, liste des lots (✕ pour retirer, + 1 lot de taille libre). Seuil d'alerte en unité ou en nombre de lots (`thresholdPacks`). Retour de courses : quantité comptée en lots.
 - Toute modification appelle `syncLowStock()` → ajout / retrait automatique dans les courses (étiquette « bas » dans le stock).
 
 ## 5 ter. Recettes (implémenté)

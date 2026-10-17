@@ -25,6 +25,17 @@ export interface StockItem extends SyncFields {
   level?: Level;
   thresholdQty?: number;
   thresholdLevel?: Level;
+  /**
+   * Lots (plaquettes, bouteilles…) : contenu restant de chacun, dans `unit`, du plus petit au plus grand.
+   * Quand présent, qty = somme des lots.
+   */
+  packs?: number[];
+  /** Nom libre d'un lot (« plaquette », « bouteille »…). */
+  packName?: string;
+  /** Contenance proposée pour un nouveau lot (dernière utilisée). */
+  packSize?: number;
+  /** Seuil d'alerte en nombre de lots (exclusif avec thresholdQty). */
+  thresholdPacks?: number;
 }
 
 export interface ShoppingItem extends SyncFields {

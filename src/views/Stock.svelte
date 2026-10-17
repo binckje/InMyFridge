@@ -5,7 +5,9 @@
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
   import { isLow } from '../lib/shopping';
-  import { UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatQty, parseStock, updateStock } from '../lib/stock';
+  import {
+    UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, splitPacks, updateStock, withQty
+  } from '../lib/stock';
   import { LEVELS, type Level, type StockItem, type Unit } from '../lib/types';
   import ScanSheet from './ScanSheet.svelte';
   import LocationsSheet from './LocationsSheet.svelte';
@@ -85,6 +87,10 @@
   ];
 
   /* ---------- Édition ---------- */
+  const num = (v: string) => {
+    const n = parseFloat(v.replace(',', '.'));
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
   let editing = $state<StockItem | null>(null);
   let form = $state({
     name: '',
@@ -95,8 +101,27 @@
     unit: 'pièce' as Unit,
     level: 'suffisamment' as Level,
     thresholdQty: '',
-    thresholdLevel: '' as Level | ''
+    thresholdLevel: '' as Level | '',
+    usePacks: false,
+    packName: '',
+    packSize: '',
+    /** Lots saisis à la main ; null = découpés automatiquement depuis quantité / contenance. */
+    packs: null as number[] | null,
+    thresholdIn: 'qty' as 'qty' | 'packs',
+    thresholdPacks: '',
+    addSize: ''
   });
+  const canPack = $derived(form.mode === 'qty' && form.unit !== 'pièce');
+  const formPacks = $derived(form.packs ?? splitPacks(num(form.qty) ?? 0, num(form.packSize) ?? num(form.qty) ?? 0));
+  const formPackName = $derived(form.packName.trim() || 'lot');
+  const fmt = (n: number) => String(n).replace('.', ',');
+  function addFormPack() {
+    const size = num(form.addSize) ?? num(form.packSize);
+    if (!size) return;
+    form.packs = [...formPacks, size].sort((a, b) => a - b);
+    form.packSize = fmt(size);
+  }
+  const removeFormPack = (i: number) => (form.packs = formPacks.filter((_, j) => j !== i));
   const formLoc = $derived(locationById(form.locationId));
 
   function edit(s: StockItem) {
@@ -110,27 +135,36 @@
       unit: s.unit ?? 'pièce',
       level: s.level ?? 'suffisamment',
       thresholdQty: s.thresholdQty == null ? '' : String(s.thresholdQty).replace('.', ','),
-      thresholdLevel: s.thresholdLevel ?? ''
+      thresholdLevel: s.thresholdLevel ?? '',
+      usePacks: !!s.packs,
+      packName: s.packName ?? '',
+      packSize: s.packSize == null ? '' : fmt(s.packSize),
+      packs: s.packs ? [...s.packs] : null,
+      thresholdIn: s.thresholdPacks != null ? 'packs' : 'qty',
+      thresholdPacks: s.thresholdPacks == null ? '' : String(s.thresholdPacks),
+      addSize: ''
     };
   }
-
-  const num = (v: string) => {
-    const n = parseFloat(v.replace(',', '.'));
-    return Number.isFinite(n) && n >= 0 ? n : undefined;
-  };
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
     if (!editing || !form.name.trim()) return;
     const qtyMode = form.mode === 'qty';
+    const packed = canPack && form.usePacks;
+    const packs = packed ? formPacks : undefined;
+    const byPacks = packed && form.thresholdIn === 'packs';
     await updateStock(editing.id, {
       name: form.name.trim(),
       locationId: form.locationId,
       categoryId: formLoc.categories?.length ? form.categoryId : undefined,
-      qty: qtyMode ? (num(form.qty) ?? 0) : undefined,
+      qty: packs ? packs.reduce((a, b) => a + b, 0) : qtyMode ? (num(form.qty) ?? 0) : undefined,
       unit: qtyMode ? form.unit : undefined,
       level: qtyMode ? undefined : form.level,
-      thresholdQty: qtyMode ? num(form.thresholdQty) : undefined,
+      packs,
+      packName: packed ? form.packName.trim() || undefined : undefined,
+      packSize: packed ? (num(form.packSize) ?? packs?.[packs.length - 1]) : undefined,
+      thresholdPacks: byPacks ? num(form.thresholdPacks) : undefined,
+      thresholdQty: qtyMode && !byPacks ? num(form.thresholdQty) : undefined,
       thresholdLevel: qtyMode ? undefined : form.thresholdLevel || undefined
     });
     editing = null;
@@ -166,7 +200,7 @@
     if (typing !== s.id) return;
     typing = null;
     const n = num(typed);
-    if (n != null && n >= 0 && n !== s.qty) await updateStock(s.id, { qty: n });
+    if (n != null && n >= 0 && n !== s.qty) await updateStock(s.id, withQty(s, n));
   }
   const focus = (el: HTMLInputElement) => el.select();
 
@@ -276,7 +310,9 @@
                 }}
               />
             {:else}
-              <button class="qty" onclick={() => startTyping(s)} aria-label="Modifier la quantité de {s.name}">{formatQty(s)}</button>
+              <button class="qty" onclick={() => startTyping(s)} aria-label="Modifier la quantité de {s.name}"
+                >{formatQty(s)}{#if s.packs}<small>{formatPacks(s)}</small>{/if}</button
+              >
             {/if}
             <button onclick={() => step(s, 1)} disabled={atMax(s)} aria-label="Plus de {s.name}">+</button>
           </div>
@@ -338,15 +374,53 @@
 
     {#if form.mode === 'qty'}
       <div class="row">
-        <input bind:value={form.qty} inputmode="decimal" placeholder="Quantité" aria-label="Quantité" />
+        {#if canPack && form.usePacks}
+          <span class="total">{fmt(formPacks.reduce((a, b) => a + b, 0))}</span>
+        {:else}
+          <input bind:value={form.qty} inputmode="decimal" placeholder="Quantité" aria-label="Quantité" />
+        {/if}
         <select bind:value={form.unit} aria-label="Unité">
           {#each UNITS as u}<option value={u}>{u}</option>{/each}
         </select>
       </div>
-      <label class="field">
+      {#if canPack}
+        <label class="check"><input type="checkbox" bind:checked={form.usePacks} /> Par lots (plaquette, bouteille…)</label>
+        {#if form.usePacks}
+          <div class="row">
+            <input bind:value={form.packName} placeholder="Nom (plaquette…)" aria-label="Nom d'un lot" />
+            <input bind:value={form.packSize} inputmode="decimal" placeholder="Contenance" aria-label="Contenance d'un lot" />
+            <span class="u">{form.unit}</span>
+          </div>
+          <div class="chips">
+            {#each formPacks as p, i (i)}
+              <button type="button" class="chip" onclick={() => removeFormPack(i)} aria-label="Retirer ce lot">{fmt(p)} {form.unit} ✕</button>
+            {/each}
+          </div>
+          <div class="row">
+            <input bind:value={form.addSize} inputmode="decimal" placeholder={form.packSize || 'Contenance'} aria-label="Contenance du lot à ajouter" />
+            <span class="u">{form.unit}</span>
+            <button type="button" class="btn" onclick={addFormPack}>+ 1 {formPackName}</button>
+          </div>
+        {/if}
+      {/if}
+      <div class="field">
         <span class="lbl">Seuil d'alerte (ajout aux courses quand ≤)</span>
-        <input bind:value={form.thresholdQty} inputmode="decimal" placeholder="Aucun" aria-label="Seuil" />
-      </label>
+        <div class="row">
+          {#if canPack && form.usePacks && form.thresholdIn === 'packs'}
+            <input bind:value={form.thresholdPacks} inputmode="numeric" placeholder="Aucun" aria-label="Seuil en lots" />
+          {:else}
+            <input bind:value={form.thresholdQty} inputmode="decimal" placeholder="Aucun" aria-label="Seuil" />
+          {/if}
+          {#if canPack && form.usePacks}
+            <div class="seg">
+              <button type="button" class:sel={form.thresholdIn === 'qty'} onclick={() => (form.thresholdIn = 'qty')}>{form.unit}</button>
+              <button type="button" class:sel={form.thresholdIn === 'packs'} onclick={() => (form.thresholdIn = 'packs')}
+                >{formPackName}s</button
+              >
+            </div>
+          {/if}
+        </div>
+      </div>
     {:else}
       <div class="chips">
         {#each LEVELS as l}
@@ -522,6 +596,12 @@
   .lbl { font-size: 13px; color: var(--muted); }
   .row { display: flex; gap: 8px; }
   .row select { width: 110px; flex: none; }
+  .row .u { align-self: center; color: var(--muted); flex: none; }
+  .row .btn { flex: none; }
+  .row .seg { flex: none; }
+  .total { flex: 1; align-self: center; font-size: 18px; font-weight: 600; padding-left: 4px; }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .qty small { display: block; font-size: 11px; line-height: 1.1; }
   .seg { display: flex; padding: 3px; border-radius: 12px; background: var(--line); }
   .seg button { flex: 1; padding: 8px; border-radius: 10px; color: var(--muted); }
   .seg button.sel { background: var(--card); color: var(--text); font-weight: 600; }

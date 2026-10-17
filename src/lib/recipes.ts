@@ -1,6 +1,6 @@
 import { db, newId } from './db';
 import { addItem } from './shopping';
-import { updateStock } from './stock';
+import { updateStock, withQty } from './stock';
 import { SEED_RECIPES } from './recipes-seed';
 import type { Recipe, RecipeIngredient, StockItem, Unit } from './types';
 
@@ -323,8 +323,8 @@ export async function cook(check: RecipeCheck, scale = 1, choice: Record<number,
     const need = unit && needIn(c.ingredient, scale, unit.dim);
     if (!unit || need == null || s.qty == null) continue;
     const qty = Math.max(0, Math.round((s.qty - need / unit.v) * 1000) / 1000);
-    done.push({ id: s.id, before: { qty: s.qty } });
-    await updateStock(s.id, { qty });
+    done.push({ id: s.id, before: { qty: s.qty, packs: s.packs } });
+    await updateStock(s.id, withQty(s, qty));
   }
   return done;
 }

@@ -138,3 +138,48 @@ describe('ranger les courses', () => {
     expect((await db.stock.toArray()).some((s) => s.name === 'pain')).toBe(true);
   });
 });
+
+describe('lots', () => {
+  it('lit « 2x250g » et découpe une quantité', async () => {
+    const { splitPacks } = await import('../src/lib/stock');
+    expect(parseStock('2x250g beurre')).toEqual({ name: 'beurre', qty: 500, unit: 'g', packs: [250, 250] });
+    expect(parseStock('beurre 2 x 250 g')?.packs).toEqual([250, 250]);
+    expect(splitPacks(600, 250)).toEqual([100, 250, 250]);
+  });
+
+  it('ajoute un lot de 500 g, puise dans l’entamé, retire un lot entier', async () => {
+    const { withQty, formatPacks } = await import('../src/lib/stock');
+    let s = (await addStock('2x250g beurre', 'frigo'))!;
+    await db.stock.update(s.id, { packName: 'plaquette' });
+    s = (await addStock('beurre 500 g', 'frigo'))!;
+    s = (await db.stock.get(s.id))!;
+    expect(s.packs).toEqual([250, 250, 500]);
+    expect(s.qty).toBe(1000);
+    expect(formatPacks(s)).toBe('3 plaquettes');
+    // 100 g utilisés : pris sur le plus petit lot
+    expect(withQty(s, 900)).toEqual({ qty: 900, packs: [150, 250, 500] });
+    // 300 g utilisés : un lot vidé, le suivant entamé
+    expect(withQty(s, 700)).toEqual({ qty: 700, packs: [200, 500] });
+    await adjust(s, -1);
+    expect((await db.stock.get(s.id))?.packs).toEqual([250, 500]);
+  });
+
+  it('seuil en nombre de lots', async () => {
+    let s = (await addStock('2x250g beurre', 'frigo'))!;
+    await db.stock.update(s.id, { thresholdPacks: 1 });
+    s = (await db.stock.get(s.id))!;
+    expect(isLow(s)).toBe(false);
+    await adjust(s, -1);
+    expect(isLow((await db.stock.get(s.id))!)).toBe(true);
+  });
+
+  it('ranger les courses : compte en lots', async () => {
+    const { planRestock, applyRestock } = await import('../src/lib/stock');
+    const s = (await addStock('1x250g beurre', 'frigo'))!;
+    await addItem('beurre', '2');
+    const lines = await planRestock(await db.shopping.toArray());
+    expect(lines[0].qty).toBe('2');
+    await applyRestock(lines);
+    expect((await db.stock.get(s.id))?.packs).toEqual([250, 250, 250]);
+  });
+});
