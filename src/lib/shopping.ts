@@ -91,6 +91,7 @@ export async function suggestions(prefix: string, limit = 6): Promise<Memory[]> 
 
 export function isLow(s: StockItem): boolean {
   if (s.deleted) return false;
+  if (s.thresholdPacks != null && s.packs) return s.packs.length <= s.thresholdPacks;
   if (s.thresholdQty != null && s.qty != null) return s.qty <= s.thresholdQty;
   if (s.thresholdLevel && s.level) return LEVELS.indexOf(s.level) <= LEVELS.indexOf(s.thresholdLevel);
   return false;

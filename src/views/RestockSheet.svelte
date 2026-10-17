@@ -18,7 +18,12 @@
     onclose(n);
   }
 
-  const unit = (l: RestockLine) => (l.stock?.unit && l.stock.unit !== 'pièce' ? l.stock.unit : '');
+  const unit = (l: RestockLine) =>
+    l.stock?.packs && l.stock.packSize
+      ? `× ${String(l.stock.packSize).replace('.', ',')} ${l.stock.unit}`
+      : l.stock?.unit && l.stock.unit !== 'pièce'
+        ? l.stock.unit
+        : '';
 </script>
 
 <button class="backdrop" aria-label="Fermer" onclick={() => onclose()} transition:fade={{ duration: 150 }}></button>
