@@ -155,6 +155,21 @@
     buzz();
     adjust(s, dir);
   }
+  // Saisie directe de la quantité (tap sur le nombre) : plus rapide que +/- pour un gros écart.
+  let typing = $state<string | null>(null);
+  let typed = $state('');
+  function startTyping(s: StockItem) {
+    typing = s.id;
+    typed = s.qty == null ? '' : String(s.qty).replace('.', ',');
+  }
+  async function commitTyped(s: StockItem) {
+    if (typing !== s.id) return;
+    typing = null;
+    const n = num(typed);
+    if (n != null && n >= 0 && n !== s.qty) await updateStock(s.id, { qty: n });
+  }
+  const focus = (el: HTMLInputElement) => el.select();
+
   const atMin = (s: StockItem) => (s.level ? s.level === LEVELS[0] : !s.qty);
   const atMax = (s: StockItem) => s.level === LEVELS[LEVELS.length - 1];
 
@@ -243,7 +258,26 @@
           </button>
           <div class="stepper">
             <button onclick={() => step(s, -1)} disabled={atMin(s)} aria-label="Moins de {s.name}">−</button>
-            <span class="qty" class:lvl={s.level} data-level={s.level}>{formatQty(s)}</span>
+            {#if s.level}
+              <span class="qty lvl" data-level={s.level}>{formatQty(s)}</span>
+            {:else if typing === s.id}
+              <!-- svelte-ignore a11y_autofocus -->
+              <input
+                class="qty qty-input"
+                bind:value={typed}
+                inputmode="decimal"
+                autofocus
+                use:focus
+                aria-label="Quantité de {s.name}"
+                onblur={() => commitTyped(s)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  else if (e.key === 'Escape') typing = null;
+                }}
+              />
+            {:else}
+              <button class="qty" onclick={() => startTyping(s)} aria-label="Modifier la quantité de {s.name}">{formatQty(s)}</button>
+            {/if}
             <button onclick={() => step(s, 1)} disabled={atMax(s)} aria-label="Plus de {s.name}">+</button>
           </div>
         </li>
@@ -437,6 +471,8 @@
   .stepper button:active { transform: scale(0.85); background: var(--green-soft); }
   .stepper button:disabled { color: var(--line); }
   .qty { min-width: 64px; text-align: center; color: var(--muted); font-size: 15px; }
+  .stepper button.qty { width: auto; height: auto; border-radius: 8px; font-size: 15px; color: var(--muted); padding: 4px 2px; }
+  .qty-input { width: 64px; border: 1px solid var(--green); border-radius: 8px; padding: 4px; font: inherit; background: transparent; color: var(--text, inherit); }
   .qty.lvl { font-size: 13px; line-height: 1.1; }
   .qty[data-level='plus beaucoup'] { color: var(--danger); }
   .qty[data-level='moyen'] { color: var(--amber); }
