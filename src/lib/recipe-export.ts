@@ -20,10 +20,16 @@ interface Sheet {
   source?: string;
 }
 
+/** « Préparation 20 min », « Cuisson 35 min » ; à défaut le temps total. */
+export function timeLabels(r: Pick<Recipe, 'time' | 'prepTime' | 'cookTime'>): string[] {
+  if (!r.prepTime && !r.cookTime) return r.time ? [`${r.time} min`] : [];
+  return [r.prepTime ? `Préparation ${r.prepTime} min` : '', r.cookTime ? `Cuisson ${r.cookTime} min` : ''].filter(Boolean);
+}
+
 function sheet(r: Recipe): Sheet {
   const meta = [
     r.yieldUnit ? yieldLabel(r.servings, r.yieldUnit) : `${r.servings} personne${r.servings > 1 ? 's' : ''}`,
-    r.time ? `${r.time} min` : '',
+    ...timeLabels(r),
     r.rating ? `${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}` : '',
     r.tags?.length ? r.tags.join(', ') : ''
   ].filter(Boolean);

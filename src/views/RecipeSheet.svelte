@@ -94,7 +94,10 @@
   {#if recipe.source === 'web'}<p class="web">🌐 Recette TheMealDB : ingrédients traduits, étapes en anglais.</p>{/if}
 
   <div class="facts">
-    {#if recipe.time}<span>⏱ {recipe.time} min</span>{/if}
+    {#if recipe.prepTime || recipe.cookTime}
+      {#if recipe.prepTime}<span>🔪 Préparation {recipe.prepTime} min</span>{/if}
+      {#if recipe.cookTime}<span>🔥 Cuisson {recipe.cookTime} min</span>{/if}
+    {:else if recipe.time}<span>⏱ {recipe.time} min</span>{/if}
     <span class="servings">
       <button onclick={() => (servings = Math.max(1, servings - step))} disabled={servings <= 1} aria-label="Moins">−</button>
       {recipe.yieldUnit ? '🔢' : '👥'} {yieldLabel(servings, recipe.yieldUnit)}

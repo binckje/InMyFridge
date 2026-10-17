@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { docxText, findServings, findTime, parseRecipeJson, parseRecipeText, rtfText } from '../src/lib/recipe-import';
+import { docxText, findServings, findTime, findTimes, parseRecipeJson, parseRecipeText, rtfText } from '../src/lib/recipe-import';
 
 const TARTE = `Tarte aux pommes
 
@@ -43,6 +43,8 @@ describe('parseRecipeText', () => {
     expect(findServings('Portions : 8')).toBe(8);
     expect(findTime('Temps total : 1 h 15')).toBe(75);
     expect(findTime('Préparation : 15 min · Cuisson : 1 h')).toBe(75);
+    expect(findTimes('Préparation : 15 min · Cuisson : 1 h')).toEqual({ prepTime: 15, cookTime: 60 });
+    expect(findTimes('Temps total : 30 min')).toEqual({ prepTime: undefined, cookTime: undefined });
   });
 });
 
