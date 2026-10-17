@@ -178,6 +178,7 @@ export async function fetchWebRecipe(id: string): Promise<Recipe | null> {
     source: 'web',
     url: m.strSource || `https://www.themealdb.com/meal/${m.idMeal}`,
     image: m.strMealThumb,
+    video: m.strYoutube || undefined,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };

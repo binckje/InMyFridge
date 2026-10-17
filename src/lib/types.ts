@@ -77,12 +77,14 @@ export interface Recipe extends SyncFields {
   servings: number;
   /** Ce que compte servings quand ce ne sont pas des personnes (« cookies », « crêpes »…). */
   yieldUnit?: string;
-  /** Temps total en minutes (préparation + cuisson quand elles sont connues). */
+  /** Temps total en minutes (préparation + cuisson + repos quand ils sont connus). */
   time?: number;
   /** Temps de préparation en minutes. */
   prepTime?: number;
   /** Temps de cuisson en minutes. */
   cookTime?: number;
+  /** Temps de repos en minutes. */
+  restTime?: number;
   tags?: string[];
   ingredients: RecipeIngredient[];
   steps: string[];
@@ -91,7 +93,10 @@ export interface Recipe extends SyncFields {
   /** base = fournie avec l'app, perso = saisie, web = importée d'internet. */
   source: 'base' | 'perso' | 'web';
   url?: string;
+  /** Image de présentation : data URL 800×600 ou adresse internet. */
   image?: string;
+  /** Lien vers une vidéo (YouTube…). Une vidéo copiée sur l'appareil est dans db.videos. */
+  video?: string;
   createdAt: number;
 }
 

@@ -379,7 +379,10 @@ export async function setCategory(ids: string[], cat?: Category) {
   });
 }
 
-export const deleteRecipe = (id: string) => db.recipes.update(id, { deleted: true, updatedAt: Date.now() });
+export async function deleteRecipe(id: string) {
+  await db.videos.delete(id);
+  await db.recipes.update(id, { deleted: true, updatedAt: Date.now() });
+}
 
 /**
  * Installe les recettes de base (identifiants fixes : pas de doublon entre appareils

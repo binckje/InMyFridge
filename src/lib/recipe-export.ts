@@ -20,10 +20,14 @@ interface Sheet {
   source?: string;
 }
 
-/** « Préparation 20 min », « Cuisson 35 min » ; à défaut le temps total. */
-export function timeLabels(r: Pick<Recipe, 'time' | 'prepTime' | 'cookTime'>): string[] {
-  if (!r.prepTime && !r.cookTime) return r.time ? [`${r.time} min`] : [];
-  return [r.prepTime ? `Préparation ${r.prepTime} min` : '', r.cookTime ? `Cuisson ${r.cookTime} min` : ''].filter(Boolean);
+/** « Préparation 20 min », « Cuisson 35 min », « Repos 1 h » ; à défaut le temps total. */
+export function timeLabels(r: Pick<Recipe, 'time' | 'prepTime' | 'cookTime' | 'restTime'>): string[] {
+  if (!r.prepTime && !r.cookTime && !r.restTime) return r.time ? [`${r.time} min`] : [];
+  return [
+    r.prepTime ? `Préparation ${r.prepTime} min` : '',
+    r.cookTime ? `Cuisson ${r.cookTime} min` : '',
+    r.restTime ? `Repos ${r.restTime} min` : ''
+  ].filter(Boolean);
 }
 
 function sheet(r: Recipe): Sheet {

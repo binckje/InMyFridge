@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { CATEGORIES, categoryOf, deleteRecipe, formatIngredient, parseIngredient, saveRecipe, withCategory, type Category } from '../lib/recipes';
+  import { deleteVideo, getVideo, imageFromUrl, MAX_VIDEO, resizeImage, saveVideo } from '../lib/media';
   import type { Recipe } from '../lib/types';
 
   /**
@@ -19,8 +20,12 @@
     servings: String(r?.servings ?? 4),
     yieldUnit: r?.yieldUnit ?? '',
     // ancienne recette sans détail : le temps total passe en préparation
-    prepTime: String(r?.prepTime ?? (r?.cookTime ? '' : (r?.time ?? ''))),
+    prepTime: String(r?.prepTime ?? (r?.cookTime || r?.restTime ? '' : (r?.time ?? ''))),
     cookTime: String(r?.cookTime ?? ''),
+    restTime: String(r?.restTime ?? ''),
+    image: r?.image ?? '',
+    imageUrl: '',
+    video: r?.video ?? '',
     tags: (r?.tags ?? []).join(', '),
     ingredients: (r?.ingredients ?? []).map((i) => formatIngredient(i) + (i.optional ? ' (facultatif)' : '')).join('\n'),
     steps: (r?.steps ?? []).join('\n')
@@ -45,15 +50,72 @@
       yieldUnit: /^(pers|$)/i.test(form.yieldUnit.trim()) ? undefined : form.yieldUnit.trim(),
       prepTime: parseInt(form.prepTime) || undefined,
       cookTime: parseInt(form.cookTime) || undefined,
-      time: (parseInt(form.prepTime) || 0) + (parseInt(form.cookTime) || 0) || undefined,
+      restTime: parseInt(form.restTime) || undefined,
+      time: (parseInt(form.prepTime) || 0) + (parseInt(form.cookTime) || 0) + (parseInt(form.restTime) || 0) || undefined,
       tags: tagList(form.tags),
       ingredients: lines(form.ingredients).map(parseIngredient),
       steps: lines(form.steps).map((s) => s.replace(/^\d+[.)]\s*/, '')),
       rating: r?.rating,
       url: r?.url,
+      image: form.image || undefined,
+      video: form.video.trim() || undefined,
       source: r?.source ?? 'perso'
     });
+    if (videoFile) await saveVideo(id, videoFile);
+    else if (videoRemoved && r?.id) await deleteVideo(r.id);
     onclose(id);
+  }
+
+  /* ---------- Image et vidéo ---------- */
+  let busy = $state(false);
+  let mediaError = $state('');
+
+  async function pickImage(e: Event & { currentTarget: HTMLInputElement }) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    busy = true;
+    mediaError = '';
+    try {
+      form.image = await resizeImage(file);
+    } catch {
+      mediaError = 'Image illisible.';
+    }
+    busy = false;
+  }
+
+  async function imageLink() {
+    const url = form.imageUrl.trim();
+    if (!/^https?:\/\//.test(url)) return;
+    busy = true;
+    form.image = await imageFromUrl(url);
+    form.imageUrl = '';
+    busy = false;
+  }
+
+  /** Vidéo copiée sur l'appareil : enregistrée avec la recette. */
+  let videoFile = $state<File | null>(null);
+  let videoRemoved = $state(false);
+  let hasLocalVideo = $state(false);
+  if (r?.id) getVideo(r.id).then((v) => (hasLocalVideo = !!v));
+
+  function pickVideo(e: Event & { currentTarget: HTMLInputElement }) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    if (file.size > MAX_VIDEO) {
+      mediaError = `Vidéo trop lourde (${Math.round(file.size / 1048576)} Mo, maximum 50 Mo).`;
+      return;
+    }
+    mediaError = '';
+    videoFile = file;
+    videoRemoved = false;
+  }
+
+  function removeVideo() {
+    videoFile = null;
+    hasLocalVideo = false;
+    videoRemoved = true;
   }
 
   async function remove() {
@@ -100,6 +162,43 @@
       <span class="lbl">Cuisson (min)</span>
       <input bind:value={form.cookTime} inputmode="numeric" placeholder="—" aria-label="Cuisson" />
     </label>
+    <label>
+      <span class="lbl">Repos (min)</span>
+      <input bind:value={form.restTime} inputmode="numeric" placeholder="—" aria-label="Repos" />
+    </label>
+  </div>
+
+  <div class="media">
+    <span class="lbl">Image de présentation (recadrée en 800×600)</span>
+    <div class="photo">
+      {#if form.image}<img src={form.image} alt="" />{:else}<span>{form.emoji || '🍽️'}</span>{/if}
+    </div>
+    <div class="row">
+      <label class="btn ghost file">
+        📷 {form.image ? 'Changer' : 'Ajouter'} la photo
+        <input type="file" accept="image/*" onchange={pickImage} hidden />
+      </label>
+      {#if form.image}<button type="button" class="btn ghost" onclick={() => (form.image = '')}>Retirer</button>{/if}
+    </div>
+    <div class="row">
+      <input bind:value={form.imageUrl} type="url" placeholder="ou adresse d'une image sur internet" aria-label="Adresse de l'image" />
+      <button type="button" class="btn ghost" onclick={imageLink} disabled={busy || !form.imageUrl.trim()}>OK</button>
+    </div>
+  </div>
+
+  <div class="media">
+    <span class="lbl">Vidéo</span>
+    <input bind:value={form.video} type="url" placeholder="Lien YouTube ou autre (https://…)" aria-label="Lien de la vidéo" />
+    <div class="row">
+      <label class="btn ghost file">
+        🎬 {videoFile || hasLocalVideo ? 'Remplacer la' : 'Ajouter une'} vidéo du téléphone
+        <input type="file" accept="video/*" onchange={pickVideo} hidden />
+      </label>
+      {#if videoFile || hasLocalVideo}<button type="button" class="btn ghost" onclick={removeVideo}>Retirer</button>{/if}
+    </div>
+    {#if videoFile}<span class="lbl">📎 {videoFile.name} — enregistrée sur cet appareil seulement</span>
+    {:else if hasLocalVideo}<span class="lbl">📎 Vidéo enregistrée sur cet appareil</span>{/if}
+    {#if mediaError}<span class="err">{mediaError}</span>{/if}
   </div>
 
   <label>
@@ -163,6 +262,11 @@
   label { display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .lbl { font-size: 13px; color: var(--muted); }
   .row { display: flex; gap: 8px; }
+  .media { display: flex; flex-direction: column; gap: 8px; }
+  .photo { aspect-ratio: 4 / 3; border-radius: var(--radius); overflow: hidden; background: var(--card); display: grid; place-items: center; font-size: 64px; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; }
+  .file { flex: 1; flex-direction: row; justify-content: center; cursor: pointer; }
+  .err { font-size: 13px; color: var(--danger); }
   textarea {
     width: 100%;
     padding: 12px 14px;

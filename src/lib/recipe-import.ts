@@ -166,13 +166,13 @@ export function findTime(text: string): number | undefined {
   return sum || undefined;
 }
 
-/** Temps de préparation et de cuisson séparés, en minutes. */
-export function findTimes(text: string): { prepTime?: number; cookTime?: number } {
+/** Temps de préparation, de cuisson et de repos séparés, en minutes. */
+export function findTimes(text: string): { prepTime?: number; cookTime?: number; restTime?: number } {
   const one = (label: string) => {
     const m = text.match(new RegExp(`${label}\\s*:?\\s*(?:(\\d+)\\s*h(?:eures?)?\\s*(\\d+)?|(\\d+)\\s*min)`, 'i'));
     return m ? (m[3] ? +m[3] : +m[1] * 60 + +(m[2] ?? 0)) || undefined : undefined;
   };
-  return { prepTime: one('pr[ée]paration'), cookTime: one('cuisson') };
+  return { prepTime: one('pr[ée]paration'), cookTime: one('cuisson'), restTime: one('repos') };
 }
 
 /** Ressemble à un ingrédient : ligne courte sans ponctuation finale (« 3 oeufs », « sel »). */
@@ -259,12 +259,14 @@ export function parseRecipeJson(text: string): Omit<Recipe, 'id' | 'createdAt' |
       time: r.time,
       prepTime: r.prepTime,
       cookTime: r.cookTime,
+      restTime: r.restTime,
       tags: r.tags ?? [],
       ingredients: r.ingredients,
       steps: r.steps ?? [],
       rating: r.rating,
       url: r.url,
       image: r.image,
+      video: r.video,
       source: r.source === 'base' ? 'perso' : (r.source ?? 'perso')
     }));
 }

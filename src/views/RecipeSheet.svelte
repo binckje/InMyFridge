@@ -11,6 +11,7 @@
     yieldLabel,
     type Consumption
   } from '../lib/recipes';
+  import { embedUrl, getVideo } from '../lib/media';
   import type { Recipe, StockItem } from '../lib/types';
 
   /** onsave : recette d'internet pas encore enregistrée (aperçu). */
@@ -71,6 +72,15 @@
     );
   }
 
+  /** Vidéo copiée sur l'appareil, lue depuis la base. */
+  let localVideo = $state<string | undefined>();
+  $effect(() => {
+    let url: string | undefined;
+    getVideo(recipe.id).then((v) => v && (localVideo = url = URL.createObjectURL(v.blob)));
+    return () => url && URL.revokeObjectURL(url);
+  });
+  const embed = $derived(recipe.video ? embedUrl(recipe.video) : undefined);
+
   const rate = (n: number) => rateRecipe(recipe.id, recipe.rating === n ? 0 : n);
 </script>
 
@@ -91,16 +101,19 @@
     <button class="close" onclick={onclose} aria-label="Fermer">✕</button>
   </div>
 
-  {#if recipe.image}<img class="photo" src={recipe.image} alt="" loading="lazy" />{/if}
+  <div class="photo">
+    {#if recipe.image}<img src={recipe.image} alt="" loading="lazy" />{:else}<span>{recipe.emoji ?? '🍽️'}</span>{/if}
+  </div>
   {#if onsave}
     <button class="btn save" onclick={onsave}>💾 Enregistrer dans mes recettes</button>
   {/if}
   {#if recipe.source === 'web'}<p class="web">🌐 Recette TheMealDB : ingrédients traduits, étapes en anglais.</p>{/if}
 
   <div class="facts">
-    {#if recipe.prepTime || recipe.cookTime}
+    {#if recipe.prepTime || recipe.cookTime || recipe.restTime}
       {#if recipe.prepTime}<span>🔪 Préparation {recipe.prepTime} min</span>{/if}
       {#if recipe.cookTime}<span>🔥 Cuisson {recipe.cookTime} min</span>{/if}
+      {#if recipe.restTime}<span>⏸️ Repos {recipe.restTime} min</span>{/if}
     {:else if recipe.time}<span>⏱ {recipe.time} min</span>{/if}
     <span class="servings">
       <button onclick={() => (servings = Math.max(1, servings - step))} disabled={servings <= 1} aria-label="Moins">−</button>
@@ -149,6 +162,19 @@
     </ol>
   {/if}
 
+  {#if localVideo || recipe.video}
+    <h3>Vidéo</h3>
+    {#if localVideo}
+      <!-- svelte-ignore a11y_media_has_caption -->
+      <video class="video" src={localVideo} controls playsinline preload="metadata"></video>
+    {:else if embed}
+      <iframe class="video" src={embed} title="Vidéo de la recette" allow="encrypted-media; picture-in-picture; fullscreen" loading="lazy"></iframe>
+    {/if}
+    {#if recipe.video && !embed}
+      <p class="src"><a href={recipe.video} target="_blank" rel="noopener">▶️ Voir la vidéo ↗</a></p>
+    {/if}
+  {/if}
+
   {#if recipe.url}
     <p class="src"><a href={recipe.url} target="_blank" rel="noopener">Voir la recette d'origine ↗</a></p>
   {/if}
@@ -193,7 +219,9 @@
   .stars button.on { color: var(--amber); }
   .stars button:active { transform: scale(1.3); }
 
-  .photo { display: block; width: 100%; max-height: 200px; object-fit: cover; border-radius: var(--radius); margin-top: 12px; }
+  .photo { aspect-ratio: 4 / 3; margin-top: 12px; border-radius: var(--radius); overflow: hidden; background: var(--card); display: grid; place-items: center; font-size: 72px; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; }
+  .video { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: #000; }
   .save { width: 100%; margin-top: 12px; }
   .web { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
   .facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 4px; color: var(--muted); font-size: 15px; }
