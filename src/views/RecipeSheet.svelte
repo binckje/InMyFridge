@@ -5,6 +5,7 @@
     checkRecipe,
     cook,
     formatIngredient,
+    matchKind,
     rateRecipe,
     undoCook,
     yieldLabel,
@@ -38,6 +39,9 @@
   /** Pas du −/+ : 1 personne, ou ~10 % de la fournée (20 cookies → 2 par 2). */
   const step = $derived(recipe.yieldUnit ? Math.max(1, Math.round(recipe.servings / 10)) : 1);
   const check = $derived(checkRecipe(recipe, stock, scale));
+  /** Produit choisi pour chaque ingrédient (index → id du stock) quand plusieurs conviennent. */
+  let choice = $state<Record<number, string>>({});
+  const chosen = (n: number) => check.checks[n].stock.find((s) => s.id === choice[n]) ?? check.checks[n].stock[0];
 
   const ICON = { ok: '✅', low: '🟠', missing: '❌', basic: '🧂' } as const;
   const HINT = { ok: '', low: 'pas assez', missing: 'manque', basic: 'placard' } as const;
@@ -59,7 +63,7 @@
 
   let cooked: Consumption[] = [];
   async function cooking() {
-    cooked = await cook(check, scale);
+    cooked = await cook(check, scale, $state.snapshot(choice));
     navigator.vibrate?.([12, 40, 12]);
     show(
       cooked.length ? `Bon appétit ! Stock mis à jour (${cooked.length} produit${cooked.length > 1 ? 's' : ''})` : 'Bon appétit !',
@@ -114,11 +118,19 @@
 
   <h3>Ingrédients</h3>
   <ul class="ings">
-    {#each check.checks as c}
+    {#each check.checks as c, n}
       <li class={c.status} class:opt={c.ingredient.optional}>
         <span class="ic">{ICON[c.status]}</span>
         <span class="txt">{formatIngredient(c.ingredient, scale)}{#if c.ingredient.optional}<em> (facultatif)</em>{/if}</span>
         {#if HINT[c.status]}<span class="hint">{HINT[c.status]}</span>{/if}
+        {#if c.status !== 'basic' && c.status !== 'missing' && c.stock.length > 1}
+          <select class="pick" value={chosen(n).id} onchange={(e) => (choice[n] = e.currentTarget.value)} aria-label="Produit utilisé">
+            {#each c.stock as s}<option value={s.id}>{s.name}</option>{/each}
+          </select>
+        {/if}
+        {#if c.status !== 'basic' && c.stock.length && matchKind(c.ingredient.name, chosen(n).name) === 'substitute'}
+          <span class="sub">⚠️ remplacé par « {chosen(n).name} »</span>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -196,6 +208,8 @@
     line-height: 1;
   }
   .servings button:disabled { opacity: 0.4; }
+  .pick { flex-basis: 100%; margin: 4px 0 0 28px; max-width: calc(100% - 28px); font-size: 14px; }
+  .sub { flex-basis: 100%; margin-left: 28px; font-size: 13px; color: var(--amber); }
   .tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
 
   .verdict { margin: 10px 0; font-weight: 600; }
@@ -204,7 +218,7 @@
 
   h3 { margin: 18px 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
   .ings { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); background: var(--card); overflow: hidden; }
-  .ings li { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .ings li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
   .ings li:last-child { border-bottom: 0; }
   .ings li.opt { opacity: 0.7; }
   .ings .txt { flex: 1; }
