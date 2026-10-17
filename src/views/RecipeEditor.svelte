@@ -18,7 +18,9 @@
     emoji: r?.emoji ?? '🍽️',
     servings: String(r?.servings ?? 4),
     yieldUnit: r?.yieldUnit ?? '',
-    time: r?.time ? String(r.time) : '',
+    // ancienne recette sans détail : le temps total passe en préparation
+    prepTime: String(r?.prepTime ?? (r?.cookTime ? '' : (r?.time ?? ''))),
+    cookTime: String(r?.cookTime ?? ''),
     tags: (r?.tags ?? []).join(', '),
     ingredients: (r?.ingredients ?? []).map((i) => formatIngredient(i) + (i.optional ? ' (facultatif)' : '')).join('\n'),
     steps: (r?.steps ?? []).join('\n')
@@ -41,7 +43,9 @@
       emoji: form.emoji.trim() || undefined,
       servings: Math.max(1, parseInt(form.servings) || 4),
       yieldUnit: /^(pers|$)/i.test(form.yieldUnit.trim()) ? undefined : form.yieldUnit.trim(),
-      time: parseInt(form.time) || undefined,
+      prepTime: parseInt(form.prepTime) || undefined,
+      cookTime: parseInt(form.cookTime) || undefined,
+      time: (parseInt(form.prepTime) || 0) + (parseInt(form.cookTime) || 0) || undefined,
       tags: tagList(form.tags),
       ingredients: lines(form.ingredients).map(parseIngredient),
       steps: lines(form.steps).map((s) => s.replace(/^\d+[.)]\s*/, '')),
@@ -85,9 +89,16 @@
       <span class="lbl">Unité (vide = personnes)</span>
       <input bind:value={form.yieldUnit} placeholder="personnes" aria-label="Unité" />
     </label>
+  </div>
+
+  <div class="row">
     <label>
-      <span class="lbl">Temps (min)</span>
-      <input bind:value={form.time} inputmode="numeric" placeholder="—" aria-label="Temps" />
+      <span class="lbl">Préparation (min)</span>
+      <input bind:value={form.prepTime} inputmode="numeric" placeholder="—" aria-label="Préparation" />
+    </label>
+    <label>
+      <span class="lbl">Cuisson (min)</span>
+      <input bind:value={form.cookTime} inputmode="numeric" placeholder="—" aria-label="Cuisson" />
     </label>
   </div>
 

@@ -166,6 +166,15 @@ export function findTime(text: string): number | undefined {
   return sum || undefined;
 }
 
+/** Temps de préparation et de cuisson séparés, en minutes. */
+export function findTimes(text: string): { prepTime?: number; cookTime?: number } {
+  const one = (label: string) => {
+    const m = text.match(new RegExp(`${label}\\s*:?\\s*(?:(\\d+)\\s*h(?:eures?)?\\s*(\\d+)?|(\\d+)\\s*min)`, 'i'));
+    return m ? (m[3] ? +m[3] : +m[1] * 60 + +(m[2] ?? 0)) || undefined : undefined;
+  };
+  return { prepTime: one('pr[ée]paration'), cookTime: one('cuisson') };
+}
+
 /** Ressemble à un ingrédient : ligne courte sans ponctuation finale (« 3 oeufs », « sel »). */
 const looksLikeIngredient = (l: string) =>
   l.length <= 60 && !/[.!?]$/.test(l) && (/^\d/.test(l) || l.split(' ').length <= 4);
@@ -229,6 +238,7 @@ export function parseRecipeText(raw: string): Omit<Recipe, 'id' | 'createdAt' | 
     emoji: '📄',
     servings,
     time,
+    ...findTimes(raw),
     tags: [],
     ingredients: ingredients.map((i) => i.trim()).filter(Boolean).map(parseIngredient),
     steps: steps.filter((s) => s.length > 2),
@@ -247,6 +257,8 @@ export function parseRecipeJson(text: string): Omit<Recipe, 'id' | 'createdAt' |
       emoji: r.emoji,
       servings: r.servings || 4,
       time: r.time,
+      prepTime: r.prepTime,
+      cookTime: r.cookTime,
       tags: r.tags ?? [],
       ingredients: r.ingredients,
       steps: r.steps ?? [],

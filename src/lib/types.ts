@@ -77,8 +77,12 @@ export interface Recipe extends SyncFields {
   servings: number;
   /** Ce que compte servings quand ce ne sont pas des personnes (« cookies », « crêpes »…). */
   yieldUnit?: string;
-  /** Temps total en minutes. */
+  /** Temps total en minutes (préparation + cuisson quand elles sont connues). */
   time?: number;
+  /** Temps de préparation en minutes. */
+  prepTime?: number;
+  /** Temps de cuisson en minutes. */
+  cookTime?: number;
   tags?: string[];
   ingredients: RecipeIngredient[];
   steps: string[];
