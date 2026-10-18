@@ -74,7 +74,7 @@ export async function addStock(
             withPacksAdded(existing, packs ?? [qty])
           : existing.unit === unit && existing.qty != null
             ? { qty: r3(existing.qty + qty) }
-            : { qty, unit, level: undefined, packs: undefined, thresholdPacks: undefined };
+            : { qty, unit, level: undefined, packs: undefined, thresholdPacks: undefined, count: undefined, countUnit: undefined, thresholdCount: undefined };
     await updateStock(existing.id, changes);
     return { ...existing, ...changes };
   }
@@ -182,8 +182,10 @@ export function adjust(item: StockItem, dir: 1 | -1) {
   return updateStock(item.id, { qty });
 }
 
+const amount = (qty: number, unit?: Unit) => `${String(qty).replace('.', ',')}${unit && unit !== 'pièce' ? ' ' + unit : ''}`;
+
 export const formatQty = (s: StockItem): string =>
-  s.level ?? (s.qty == null ? '' : `${String(s.qty).replace('.', ',')}${s.unit && s.unit !== 'pièce' ? ' ' + s.unit : ''}`);
+  s.level ? s.level + (s.count == null ? '' : ` · ${amount(s.count, s.countUnit)}`) : s.qty == null ? '' : amount(s.qty, s.unit);
 
 /* ---------- Retour de courses ---------- */
 

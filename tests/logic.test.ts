@@ -164,6 +164,16 @@ describe('lots', () => {
     expect((await db.stock.get(s.id))?.packs).toEqual([250, 500]);
   });
 
+  it('produit suivi par niveau : seuil sur la quantité', async () => {
+    let s = (await addStock('café', 'placard'))!;
+    await db.stock.update(s.id, { level: 'suffisamment', thresholdLevel: undefined, count: 3, countUnit: 'pièce', thresholdCount: 2 });
+    s = (await db.stock.get(s.id))!;
+    expect(isLow(s)).toBe(false);
+    expect(formatQty(s)).toBe('suffisamment · 3');
+    expect(isLow({ ...s, count: 2 })).toBe(true);
+    expect(isLow({ ...s, count: 3, thresholdLevel: 'moyen', level: 'moyen' })).toBe(true);
+  });
+
   it('seuil en nombre de lots', async () => {
     let s = (await addStock('2x250g beurre', 'frigo'))!;
     await db.stock.update(s.id, { thresholdPacks: 1 });

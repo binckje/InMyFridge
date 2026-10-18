@@ -5,6 +5,7 @@
     checkRecipe,
     cook,
     formatIngredient,
+    isSection,
     matchKind,
     rateRecipe,
     undoCook,
@@ -134,6 +135,9 @@
   <h3>Ingrédients</h3>
   <ul class="ings">
     {#each check.checks as c, n}
+      {#if isSection(c.ingredient)}
+      <li class="sec">{formatIngredient(c.ingredient)}</li>
+      {:else}
       <li class={c.status} class:opt={c.ingredient.optional}>
         <span class="ic">{ICON[c.status]}</span>
         <span class="txt">{formatIngredient(c.ingredient, scale)}{#if c.ingredient.optional}<em> (facultatif)</em>{/if}</span>
@@ -153,6 +157,7 @@
           </span>
         {/if}
       </li>
+      {/if}
     {/each}
   </ul>
 
@@ -258,6 +263,7 @@
   .ings { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); background: var(--card); overflow: hidden; }
   .ings li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
   .ings li:last-child { border-bottom: 0; }
+  .ings li.sec { font-weight: 700; background: var(--line); padding: 6px 14px; }
   .ings li.opt { opacity: 0.7; }
   .ings .txt { flex: 1; }
   .ings em { color: var(--muted); font-size: 14px; }

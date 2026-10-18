@@ -227,6 +227,7 @@ const UNIT_RE =
 /** « 200 g de farine », « 3 oeufs », « 1 c. à soupe d'huile », « sel » → ingrédient structuré. */
 export function parseIngredient(line: string): RecipeIngredient {
   let s = line.trim().replace(/\s+/g, ' ');
+  if (/[:：]$/.test(s)) return { name: s.replace(/\s*[:：]$/, ''), section: true };
   const optional = /\((?:facultatif|optionnel)\)/i.test(s);
   s = s.replace(/\((?:facultatif|optionnel)\)/i, '').trim();
   const m = s.match(new RegExp(`^(\\d+(?:[.,/]\\d+)?)\\s*(?:${UNIT_RE}(?=[\\s'’]|$))?\\s*(?:de |d['’])?(.+)$`, 'i'));
@@ -243,7 +244,11 @@ export function parseIngredient(line: string): RecipeIngredient {
   return out;
 }
 
+/** Titre de préparation (« Pour la pâte : ») ; aussi les recettes enregistrées avant le flag. */
+export const isSection = (i: RecipeIngredient) => !!i.section || /[:：]\s*$/.test(i.name);
+
 export const formatIngredient = (i: RecipeIngredient, scale = 1): string => {
+  if (isSection(i)) return `${i.name.replace(/\s*[:：]\s*$/, '')} :`;
   if (i.qty == null) return i.name;
   const q = Math.round(i.qty * scale * 100) / 100;
   const n = String(q).replace('.', ',');
@@ -279,7 +284,7 @@ export interface RecipeCheck {
 
 /** useClose : l'utilisateur accepte les produits voisins (suggestions) pour cet ingrédient. */
 export function checkIngredient(ing: RecipeIngredient, stock: StockItem[], scale = 1, useClose = false): IngredientCheck {
-  if (isBasic(ing.name)) return { ingredient: ing, status: 'basic', stock: [] };
+  if (isSection(ing) || isBasic(ing.name)) return { ingredient: ing, status: 'basic', stock: [] };
   const kind = new Map<StockItem, MatchKind>();
   const close: StockItem[] = [];
   for (const s of stock) {
