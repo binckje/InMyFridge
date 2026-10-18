@@ -18,7 +18,7 @@ import {
   yieldLabel
 } from '../src/lib/recipes';
 import { SEED_RECIPES } from '../src/lib/recipes-seed';
-import type { StockItem } from '../src/lib/types';
+import type { Recipe, StockItem } from '../src/lib/types';
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()));
@@ -213,5 +213,16 @@ describe('catégories', () => {
     await setCategory(['a', 'b'], 'dessert');
     expect((await db.recipes.get('a'))?.tags).toEqual(['dessert']);
     expect((await db.recipes.get('b'))?.tags).toEqual(['dessert']);
+  });
+});
+
+describe('titres de préparation', () => {
+  it('une ligne terminée par « : » n’est pas un ingrédient requis', () => {
+    expect(parseIngredient('Pour la pâte :')).toEqual({ name: 'Pour la pâte', section: true });
+    expect(formatIngredient(parseIngredient('Garniture:'))).toBe('Garniture :');
+    const r = { name: 'T', servings: 1, steps: [], ingredients: ['Pâte :', 'Crème :'].map(parseIngredient) } as unknown as Recipe;
+    const c = checkRecipe(r, []);
+    expect(c.missing).toHaveLength(0);
+    expect(c.feasible).toBe(true);
   });
 });

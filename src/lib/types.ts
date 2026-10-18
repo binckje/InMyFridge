@@ -80,6 +80,8 @@ export interface RecipeIngredient {
   /** Unité convertible (g, kg, ml, cl, l, pièce) ou libellé libre (« c. à soupe », « pincée »…). */
   unit?: Unit | string;
   optional?: boolean;
+  /** Titre de préparation (ligne terminée par « : »), pas un ingrédient. */
+  section?: boolean;
 }
 
 export interface Recipe extends SyncFields {
