@@ -102,6 +102,9 @@
     level: 'suffisamment' as Level,
     thresholdQty: '',
     thresholdLevel: '' as Level | '',
+    count: '',
+    countUnit: 'pièce' as Unit,
+    thresholdCount: '',
     usePacks: false,
     packName: '',
     packSize: '',
@@ -136,6 +139,9 @@
       level: s.level ?? 'suffisamment',
       thresholdQty: s.thresholdQty == null ? '' : String(s.thresholdQty).replace('.', ','),
       thresholdLevel: s.thresholdLevel ?? '',
+      count: s.count == null ? '' : fmt(s.count),
+      countUnit: s.countUnit ?? 'pièce',
+      thresholdCount: s.thresholdCount == null ? '' : fmt(s.thresholdCount),
       usePacks: !!s.packs,
       packName: s.packName ?? '',
       packSize: s.packSize == null ? '' : fmt(s.packSize),
@@ -165,7 +171,10 @@
       packSize: packed ? (num(form.packSize) ?? packs?.[packs.length - 1]) : undefined,
       thresholdPacks: byPacks ? num(form.thresholdPacks) : undefined,
       thresholdQty: qtyMode && !byPacks ? num(form.thresholdQty) : undefined,
-      thresholdLevel: qtyMode ? undefined : form.thresholdLevel || undefined
+      thresholdLevel: qtyMode ? undefined : form.thresholdLevel || undefined,
+      count: qtyMode ? undefined : num(form.count),
+      countUnit: qtyMode || num(form.count) == null ? undefined : form.countUnit,
+      thresholdCount: qtyMode ? undefined : num(form.thresholdCount)
     });
     editing = null;
   }
@@ -438,6 +447,22 @@
               >{l}</button
             >
           {/each}
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">Quantité (facultatif)</span>
+        <div class="row">
+          <input bind:value={form.count} inputmode="decimal" placeholder="Aucune" aria-label="Quantité" />
+          <select bind:value={form.countUnit} aria-label="Unité">
+            {#each UNITS as u}<option value={u}>{u}</option>{/each}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">Seuil sur la quantité (ajout aux courses quand ≤)</span>
+        <div class="row">
+          <input bind:value={form.thresholdCount} inputmode="decimal" placeholder="Aucun" aria-label="Seuil sur la quantité" />
+          <span class="u">{form.countUnit}</span>
         </div>
       </div>
     {/if}

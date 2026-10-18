@@ -36,6 +36,11 @@ export interface StockItem extends SyncFields {
   packSize?: number;
   /** Seuil d'alerte en nombre de lots (exclusif avec thresholdQty). */
   thresholdPacks?: number;
+  /** Quantité facultative d'un produit suivi par niveau (« moyen, 3 boîtes »). */
+  count?: number;
+  countUnit?: Unit;
+  /** Seuil d'alerte sur count (en plus de thresholdLevel). */
+  thresholdCount?: number;
 }
 
 export interface ShoppingItem extends SyncFields {
