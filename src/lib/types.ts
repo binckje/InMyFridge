@@ -41,6 +41,18 @@ export interface StockItem extends SyncFields {
   countUnit?: Unit;
   /** Seuil d'alerte sur count (en plus de thresholdLevel). */
   thresholdCount?: number;
+  /** Groupe (fromages…) : le seuil du groupe remplace les seuils du produit. */
+  groupId?: string;
+}
+
+/** Groupe de produits interchangeables dont le total déclenche l'ajout aux courses. */
+export interface StockGroup extends SyncFields {
+  name: string;
+  /** qty : quantités additionnées dans `unit` ; count : nombre de produits du groupe encore en stock. */
+  mode: 'qty' | 'count';
+  unit?: Unit;
+  /** Ajout aux courses quand le total ≤ threshold. */
+  threshold?: number;
 }
 
 export interface ShoppingItem extends SyncFields {
@@ -52,6 +64,8 @@ export interface ShoppingItem extends SyncFields {
   createdAt: number;
   /** Ajouté automatiquement car ce produit du stock est sous son seuil. */
   stockItemId?: string;
+  /** Ajouté automatiquement car ce groupe du stock est sous son seuil. */
+  groupId?: string;
 }
 
 export interface Category {

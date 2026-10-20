@@ -10,6 +10,7 @@ import {
   checkRecipe,
   cook,
   formatIngredient,
+  isBasic,
   matches,
   matchKind,
   parseIngredient,
@@ -183,6 +184,13 @@ describe('checkRecipe / cook', () => {
     await seedRecipes();
     expect(await db.recipes.count()).toBe(n);
     expect((await db.recipes.get('base-crepes'))?.deleted).toBe(true);
+  });
+});
+
+describe('isBasic', () => {
+  it('reconnaît sel et poivre même précisés', () => {
+    for (const n of ['sel', 'sel (pincée)', 'Sel fin', 'poivre du moulin', 'sel et poivre', 'eau']) expect(isBasic(n), n).toBe(true);
+    for (const n of ['sel de céleri', 'poivron', 'eau de fleur d’oranger']) expect(isBasic(n), n).toBe(false);
   });
 });
 

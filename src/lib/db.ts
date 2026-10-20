@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Snapshot } from './sync';
-import type { Product, Recipe, ShoppingItem, StockItem, StoredLocation } from './types';
+import type { Product, Recipe, ShoppingItem, StockGroup, StockItem, StoredLocation } from './types';
 
 /** Mémoire des articles déjà achetés : rayon retenu + fréquence (pour les suggestions). */
 export interface Memory {
@@ -34,6 +34,7 @@ export const db = new Dexie('inmyfridge') as Dexie & {
   locations: EntityTable<StoredLocation, 'id'>;
   videos: EntityTable<RecipeVideo, 'id'>;
   snapshots: EntityTable<LocalSnapshot, 'id'>;
+  groups: EntityTable<StockGroup, 'id'>;
 };
 
 db.version(1).stores({
@@ -58,6 +59,7 @@ db.version(4).stores({ products: 'code, updatedAt' });
 db.version(5).stores({ locations: 'id, order, updatedAt' });
 db.version(6).stores({ videos: 'id' });
 db.version(7).stores({ snapshots: 'id' });
+db.version(8).stores({ groups: 'id, updatedAt' });
 
 export const newId = () => crypto.randomUUID();
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/lib/db';
 import { guessAisle } from '../src/lib/aisles';
-import { addStock, adjust, formatQty, parseStock } from '../src/lib/stock';
-import { addItem, isLow, syncLowStock } from '../src/lib/shopping';
+import { addStock, adjust, formatQty, parseStock, saveGroup, updateStock } from '../src/lib/stock';
+import { addItem, groupTotal, isLow, syncLowStock } from '../src/lib/shopping';
 import { syncWith, type Snapshot, type SyncProvider } from '../src/lib/sync';
 
 beforeEach(async () => {
@@ -55,6 +55,43 @@ describe('stock', () => {
     await syncLowStock();
     list = (await db.shopping.toArray()).filter((i) => !i.deleted);
     expect(list).toHaveLength(0);
+  });
+});
+
+describe('groupes', () => {
+  const todo = async () => (await db.shopping.toArray()).filter((i) => !i.deleted);
+
+  it('seuil en quantité : total converti, seuils individuels ignorés', async () => {
+    const g = await saveGroup('Fromage', { mode: 'qty', unit: 'g', threshold: 200 });
+    const a = (await addStock('emmental 150 g', 'frigo'))!;
+    const b = (await addStock('comté 0,1 kg', 'frigo'))!;
+    await updateStock(a.id, { groupId: g, thresholdQty: 500 });
+    await updateStock(b.id, { groupId: g });
+    const stock = await db.stock.toArray();
+    expect(groupTotal((await db.groups.get(g))!, stock)).toBe(250);
+    expect(await todo()).toHaveLength(0);
+    await updateStock(b.id, { qty: 0.05 });
+    expect((await todo()).map((i) => [i.name, i.groupId])).toEqual([['Fromage', g]]);
+    await updateStock(a.id, { qty: 400 });
+    expect(await todo()).toHaveLength(0);
+  });
+
+  it('seuil en nombre de produits', async () => {
+    const g = await saveGroup('Pâtes', { mode: 'count', threshold: 1 });
+    const a = (await addStock('spaghetti', 'epicerie-salee'))!;
+    const b = (await addStock('penne', 'epicerie-salee'))!;
+    await updateStock(a.id, { groupId: g });
+    await updateStock(b.id, { groupId: g });
+    expect(await todo()).toHaveLength(0);
+    await updateStock(b.id, { level: 'plus beaucoup' });
+    expect((await todo()).map((i) => i.name)).toEqual(['Pâtes']);
+  });
+
+  it('même nom → même groupe', async () => {
+    const a = await saveGroup('Fromage', { mode: 'count', threshold: 1 });
+    const b = await saveGroup(' fromage ', { mode: 'qty', unit: 'g', threshold: 100 });
+    expect(b).toBe(a);
+    expect(await db.groups.count()).toBe(1);
   });
 });
 

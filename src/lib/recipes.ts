@@ -175,7 +175,13 @@ export const matches = (ingredient: string, stockName: string): boolean => {
 
 /** Toujours considérés comme disponibles. */
 const BASICS = new Set(['sel', 'poivre', 'eau', 'sel poivre']);
-export const isBasic = (name: string) => BASICS.has(tokens(name).join(' '));
+/** Sel, poivre, eau : toujours disponibles, même précisés (« sel (pincée) », « poivre du moulin », « sel fin »). */
+export const isBasic = (name: string) =>
+  BASICS.has(
+    tokens(name.replace(/\([^)]*\)/g, ' '))
+      .filter((w) => !QUALIFIERS.has(w) && w !== 'moulin')
+      .join(' ')
+  );
 
 /* ---------- Unités ---------- */
 
@@ -280,6 +286,8 @@ export interface RecipeCheck {
   feasible: boolean;
   /** Part des ingrédients disponibles (0 → 1). */
   score: number;
+  /** Part des ingrédients manquants remplaçables par un produit voisin en stock (0 → 1). */
+  near: number;
 }
 
 /** useClose : l'utilisateur accepte les produits voisins (suggestions) pour cet ingrédient. */
@@ -342,7 +350,8 @@ export function checkRecipe(recipe: Recipe, stock: StockItem[], scale = 1, useCl
     checks,
     missing,
     feasible: missing.length === 0,
-    score: counted.length ? have / counted.length : 1
+    score: counted.length ? have / counted.length : 1,
+    near: counted.length ? missing.filter((c) => c.close).length / counted.length : 0
   };
 }
 
