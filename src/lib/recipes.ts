@@ -175,7 +175,13 @@ export const matches = (ingredient: string, stockName: string): boolean => {
 
 /** Toujours considérés comme disponibles. */
 const BASICS = new Set(['sel', 'poivre', 'eau', 'sel poivre']);
-export const isBasic = (name: string) => BASICS.has(tokens(name).join(' '));
+/** Sel, poivre, eau : toujours disponibles, même précisés (« sel (pincée) », « poivre du moulin », « sel fin »). */
+export const isBasic = (name: string) =>
+  BASICS.has(
+    tokens(name.replace(/\([^)]*\)/g, ' '))
+      .filter((w) => !QUALIFIERS.has(w) && w !== 'moulin')
+      .join(' ')
+  );
 
 /* ---------- Unités ---------- */
 
