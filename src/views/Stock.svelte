@@ -58,6 +58,16 @@
     })).filter((g) => g.items.length);
   });
 
+  /** Sections repliées (clé de groupe), mémorisées localement. */
+  const FOLD_KEY = 'imf.stock.folded';
+  let folded = $state<string[]>((() => {
+    try { return JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]'); } catch { return []; }
+  })());
+  function toggleFold(key: string) {
+    folded = folded.includes(key) ? folded.filter((k) => k !== key) : [...folded, key];
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch { /* stockage indisponible */ }
+  }
+
   /* ---------- Ajout rapide ---------- */
   const target = $derived(LOCATIONS.find((l) => l.id === filter));
   async function submit(e: SubmitEvent) {
@@ -322,8 +332,14 @@
 
 {#each groups as g (g.key)}
   <section transition:slide={{ duration: 200 }}>
-    <h2>{g.title} <span>{g.items.length}</span></h2>
-    <ul>
+    <h2>
+      <button class="fold" onclick={() => toggleFold(g.key)} aria-expanded={!folded.includes(g.key)}>
+        <span class="chev" class:closed={folded.includes(g.key)}>▾</span>
+        {g.title} <span>{g.items.length}</span>
+      </button>
+    </h2>
+    {#if !folded.includes(g.key)}
+    <ul transition:slide={{ duration: 200 }}>
       {#each g.items as s (s.id)}
         <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }} class:flash={flash === s.id}>
           <button class="label" onclick={() => edit(s)}>
@@ -359,6 +375,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
   </section>
 {/each}
 
@@ -594,6 +611,16 @@
     color: var(--muted);
   }
   h2 span { font-weight: 400; }
+  .fold {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .chev { display: inline-block; transition: transform 0.2s; }
+  .chev.closed { transform: rotate(-90deg); }
   ul { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); background: var(--card); overflow: hidden; }
   li {
     display: flex;
