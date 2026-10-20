@@ -270,10 +270,15 @@
           {#if c.feasible}
             <span class="status ok">✅ Faisable</span>
           {:else}
-            <span class="status miss">Manque {c.missing.length} : {c.missing.map((m) => m.ingredient.name).join(', ')}</span>
+            <span class="status miss"
+              >Manque {c.missing.length} : {#each c.missing as m, i}{i ? ', ' : ''}<span class:near={m.close}
+                  title={m.close ? `En stock : ${m.close.map((s) => s.name).join(', ')}` : undefined}>{m.ingredient.name}</span
+                >{/each}</span
+            >
           {/if}
         </span>
-        <span class="ring" style="--p: {c.score}" aria-label="{Math.round(c.score * 100)} % des ingrédients"></span>
+        <span class="ring" style="--p: {c.score}; --q: {c.score + c.near}"
+          aria-label="{Math.round(c.score * 100)} % des ingrédients{c.near ? `, ${Math.round(c.near * 100)} % remplaçables` : ''}"></span>
       </button>
     </li>
   {/each}
@@ -434,14 +439,19 @@
   .status { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .status.ok { color: var(--green); font-weight: 600; }
   .status.miss { color: var(--muted); }
+  .status .near { color: var(--amber); }
 
-  /* Anneau de progression : part des ingrédients disponibles. */
+  /* Anneau de progression : ingrédients disponibles (vert), puis remplaçables par un produit voisin (orange). */
   .ring {
     flex: none;
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    background: conic-gradient(var(--green) calc(var(--p) * 360deg), var(--line) 0);
+    background: conic-gradient(
+      var(--green) calc(var(--p) * 360deg),
+      var(--amber) 0 calc(var(--q) * 360deg),
+      var(--line) 0
+    );
     mask: radial-gradient(circle, transparent 9px, #000 10px);
     -webkit-mask: radial-gradient(circle, transparent 9px, #000 10px);
   }
