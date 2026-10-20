@@ -1,7 +1,7 @@
 import { db, newId } from './db';
 import { aisleFor, syncLowStock } from './shopping';
 import { guessCategory, guessLocation, locationById } from './locations.svelte';
-import { LEVELS, type Level, type ShoppingItem, type StockItem, type Unit } from './types';
+import { LEVELS, type Level, type ShoppingItem, type StockGroup, type StockItem, type Unit } from './types';
 
 export const UNITS: Unit[] = ['pièce', 'g', 'kg', 'ml', 'cl', 'l'];
 
@@ -96,6 +96,15 @@ export async function addStock(
 export async function updateStock(id: string, changes: Partial<Omit<StockItem, 'id'>>) {
   await db.stock.update(id, { ...changes, updatedAt: Date.now() });
   await syncLowStock();
+}
+
+/** Crée le groupe (ou met à jour celui du même nom) et retourne son id. Ne relance pas syncLowStock. */
+export async function saveGroup(name: string, settings: Pick<StockGroup, 'mode' | 'unit' | 'threshold'>): Promise<string> {
+  const clean = name.trim();
+  const existing = (await db.groups.toArray()).find((g) => !g.deleted && keyOf(g.name) === keyOf(clean));
+  const group: StockGroup = { id: existing?.id ?? newId(), name: clean, ...settings, updatedAt: Date.now() };
+  await db.groups.put(group);
+  return group.id;
 }
 
 export const deleteStock = (id: string) => updateStock(id, { deleted: true });

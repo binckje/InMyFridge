@@ -1,6 +1,6 @@
 import { db, newId, type Memory } from './db';
 import { guessAisle } from './aisles';
-import { LEVELS, type ShoppingItem, type StockItem } from './types';
+import { LEVELS, type ShoppingItem, type StockGroup, type StockItem, type Unit } from './types';
 
 const keyOf = (name: string) =>
   name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -89,14 +89,44 @@ export async function suggestions(prefix: string, limit = 6): Promise<Memory[]> 
 
 /* ---------- Lien stock → courses ---------- */
 
+/** Produit sous son propre seuil (un produit d'un groupe ne compte que via le seuil du groupe). */
 export function isLow(s: StockItem): boolean {
-  if (s.deleted) return false;
+  if (s.deleted || s.groupId) return false;
   if (s.thresholdPacks != null && s.packs) return s.packs.length <= s.thresholdPacks;
   if (s.thresholdQty != null && s.qty != null) return s.qty <= s.thresholdQty;
   if (s.thresholdLevel && s.level && LEVELS.indexOf(s.level) <= LEVELS.indexOf(s.thresholdLevel)) return true;
   if (s.thresholdCount != null && s.level && s.count != null) return s.count <= s.thresholdCount;
   return false;
 }
+
+const DIM: Record<Unit, [string, number]> = {
+  g: ['m', 1], kg: ['m', 1000], ml: ['v', 1], cl: ['v', 10], l: ['v', 1000], pièce: ['n', 1]
+};
+
+/** Produit encore en stock : quantité > 0, ou niveau au-dessus de « plus beaucoup ». */
+const inStock = (s: StockItem) => (s.level ? s.level !== 'plus beaucoup' : (s.qty ?? 0) > 0);
+
+export const groupMembers = (g: StockGroup, stock: StockItem[]) => stock.filter((s) => !s.deleted && s.groupId === g.id);
+
+/**
+ * Total du groupe : nombre de produits en stock (count), ou somme des quantités convertibles
+ * dans l'unité du groupe (qty ; les produits suivis par niveau ou d'une autre dimension sont ignorés).
+ */
+export function groupTotal(g: StockGroup, stock: StockItem[]): number {
+  const members = groupMembers(g, stock);
+  if (g.mode === 'count') return members.filter(inStock).length;
+  const [dim, f] = DIM[g.unit ?? 'pièce'];
+  let total = 0;
+  for (const s of members) {
+    if (s.level || s.qty == null) continue;
+    const [d, k] = DIM[s.unit ?? 'pièce'];
+    if (d === dim) total += (s.qty * k) / f;
+  }
+  return Math.round(total * 1000) / 1000;
+}
+
+export const isGroupLow = (g: StockGroup, stock: StockItem[]) =>
+  !g.deleted && g.threshold != null && groupTotal(g, stock) <= g.threshold;
 
 /**
  * Ajoute à la liste les produits du stock passés sous leur seuil (une seule fois par produit),
@@ -121,6 +151,26 @@ export async function syncLowStock(): Promise<number> {
         createdAt: now,
         updatedAt: now,
         stockItemId: s.id
+      });
+      added++;
+    } else if (!low && entry) {
+      await deleteItem(entry.id);
+    }
+  }
+  const byGroup = new Map(list.filter((i) => i.groupId).map((i) => [i.groupId!, i]));
+  for (const g of await db.groups.toArray()) {
+    const low = isGroupLow(g, stock);
+    const entry = byGroup.get(g.id);
+    if (low && !entry && !list.some((i) => keyOf(i.name) === keyOf(g.name))) {
+      const now = Date.now();
+      await db.shopping.add({
+        id: newId(),
+        name: g.name,
+        aisleId: groupMembers(g, stock)[0]?.aisleId ?? (await aisleFor(g.name)),
+        checked: false,
+        createdAt: now,
+        updatedAt: now,
+        groupId: g.id
       });
       added++;
     } else if (!low && entry) {

@@ -4,9 +4,9 @@
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
-  import { isLow } from '../lib/shopping';
+  import { isGroupLow, isLow } from '../lib/shopping';
   import {
-    UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, splitPacks, updateStock, withQty
+    UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
   } from '../lib/stock';
   import { LEVELS, type Level, type StockItem, type Unit } from '../lib/types';
   import ScanSheet from './ScanSheet.svelte';
@@ -18,6 +18,10 @@
 
   const items = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
   const all = $derived(($items ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, 'fr')));
+  const stockGroups = liveQuery(() => db.groups.filter((g) => !g.deleted).toArray());
+  const lowGroups = $derived(new Set(($stockGroups ?? []).filter((g) => isGroupLow(g, all)).map((g) => g.id)));
+  /** Sous son seuil, ou membre d'un groupe sous le seuil du groupe. */
+  const isBas = (s: StockItem) => isLow(s) || (!!s.groupId && lowGroups.has(s.groupId));
 
   /* ---------- Filtres ---------- */
   type Filter = 'tout' | 'bas' | string;
@@ -25,11 +29,11 @@
   let text = $state('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-  const low = $derived(all.filter(isLow));
+  const low = $derived(all.filter(isBas));
   const shown = $derived(
     all.filter(
       (s) =>
-        (filter === 'tout' || (filter === 'bas' ? isLow(s) : s.locationId === filter)) &&
+        (filter === 'tout' || (filter === 'bas' ? isBas(s) : s.locationId === filter)) &&
         (!text.trim() || norm(s.name).includes(norm(parseStock(text.trim()).name)))
     )
   );
@@ -112,8 +116,22 @@
     packs: null as number[] | null,
     thresholdIn: 'qty' as 'qty' | 'packs',
     thresholdPacks: '',
-    addSize: ''
+    addSize: '',
+    group: '',
+    groupMode: 'qty' as 'qty' | 'count',
+    groupUnit: 'g' as Unit,
+    groupThreshold: ''
   });
+  const groupKey = (n: string) => n.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const grouped = $derived(!!form.group.trim());
+  /** Reprend les réglages du groupe existant choisi. */
+  function pickGroup() {
+    const g = ($stockGroups ?? []).find((g) => groupKey(g.name) === groupKey(form.group));
+    if (!g) return;
+    form.groupMode = g.mode;
+    form.groupUnit = g.unit ?? 'g';
+    form.groupThreshold = g.threshold == null ? '' : fmt(g.threshold);
+  }
   const canPack = $derived(form.mode === 'qty' && form.unit !== 'pièce');
   const formPacks = $derived(form.packs ?? splitPacks(num(form.qty) ?? 0, num(form.packSize) ?? num(form.qty) ?? 0));
   const formPackName = $derived(form.packName.trim() || 'lot');
@@ -148,8 +166,13 @@
       packs: s.packs ? [...s.packs] : null,
       thresholdIn: s.thresholdPacks != null ? 'packs' : 'qty',
       thresholdPacks: s.thresholdPacks == null ? '' : String(s.thresholdPacks),
-      addSize: ''
+      addSize: '',
+      group: ($stockGroups ?? []).find((g) => g.id === s.groupId)?.name ?? '',
+      groupMode: 'qty',
+      groupUnit: s.unit && s.unit !== 'pièce' ? s.unit : 'g',
+      groupThreshold: ''
     };
+    pickGroup();
   }
 
   async function save(e: SubmitEvent) {
@@ -158,8 +181,16 @@
     const qtyMode = form.mode === 'qty';
     const packed = canPack && form.usePacks;
     const packs = packed ? formPacks : undefined;
-    const byPacks = packed && form.thresholdIn === 'packs';
+    const byPacks = packed && form.thresholdIn === 'packs' && !grouped;
+    const groupId = grouped
+      ? await saveGroup(form.group, {
+          mode: form.groupMode,
+          unit: form.groupMode === 'qty' ? form.groupUnit : undefined,
+          threshold: num(form.groupThreshold)
+        })
+      : undefined;
     await updateStock(editing.id, {
+      groupId,
       name: form.name.trim(),
       locationId: form.locationId,
       categoryId: formLoc.categories?.length ? form.categoryId : undefined,
@@ -170,11 +201,11 @@
       packName: packed ? form.packName.trim() || undefined : undefined,
       packSize: packed ? (num(form.packSize) ?? packs?.[packs.length - 1]) : undefined,
       thresholdPacks: byPacks ? num(form.thresholdPacks) : undefined,
-      thresholdQty: qtyMode && !byPacks ? num(form.thresholdQty) : undefined,
-      thresholdLevel: qtyMode ? undefined : form.thresholdLevel || undefined,
+      thresholdQty: qtyMode && !byPacks && !grouped ? num(form.thresholdQty) : undefined,
+      thresholdLevel: qtyMode || grouped ? undefined : form.thresholdLevel || undefined,
       count: qtyMode ? undefined : num(form.count),
       countUnit: qtyMode || num(form.count) == null ? undefined : form.countUnit,
-      thresholdCount: qtyMode ? undefined : num(form.thresholdCount)
+      thresholdCount: qtyMode || grouped ? undefined : num(form.thresholdCount)
     });
     editing = null;
   }
@@ -297,7 +328,7 @@
         <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }} class:flash={flash === s.id}>
           <button class="label" onclick={() => edit(s)}>
             <span class="name">{s.name}</span>
-            {#if isLow(s)}<span class="tag">bas</span>{/if}
+            {#if isBas(s)}<span class="tag">bas</span>{/if}
           </button>
           <div class="stepper">
             <button onclick={() => step(s, -1)} disabled={atMin(s)} aria-label="Moins de {s.name}">−</button>
@@ -412,6 +443,7 @@
           </div>
         {/if}
       {/if}
+      {#if !grouped}
       <div class="field">
         <span class="lbl">Seuil d'alerte (ajout aux courses quand ≤)</span>
         <div class="row">
@@ -430,12 +462,14 @@
           {/if}
         </div>
       </div>
+      {/if}
     {:else}
       <div class="chips">
         {#each LEVELS as l}
           <button type="button" class="chip" class:sel={form.level === l} onclick={() => (form.level = l)}>{l}</button>
         {/each}
       </div>
+      {#if !grouped}
       <div class="field">
         <span class="lbl">Seuil d'alerte (ajout aux courses quand ≤)</span>
         <div class="chips">
@@ -449,6 +483,7 @@
           {/each}
         </div>
       </div>
+      {/if}
       <div class="field">
         <span class="lbl">Quantité (facultatif)</span>
         <div class="row">
@@ -458,11 +493,44 @@
           </select>
         </div>
       </div>
+      {#if !grouped}
       <div class="field">
         <span class="lbl">Seuil sur la quantité (ajout aux courses quand ≤)</span>
         <div class="row">
           <input bind:value={form.thresholdCount} inputmode="decimal" placeholder="Aucun" aria-label="Seuil sur la quantité" />
           <span class="u">{form.countUnit}</span>
+        </div>
+      </div>
+      {/if}
+    {/if}
+
+    <div class="field">
+      <span class="lbl">Groupe (fromages…) : seuil commun à tous ses produits</span>
+      <input bind:value={form.group} onchange={pickGroup} list="stock-groups" placeholder="Aucun" aria-label="Groupe" />
+      <datalist id="stock-groups">
+        {#each $stockGroups ?? [] as g (g.id)}<option value={g.name}></option>{/each}
+      </datalist>
+    </div>
+    {#if grouped}
+      <div class="field">
+        <div class="seg">
+          <button type="button" class:sel={form.groupMode === 'qty'} onclick={() => (form.groupMode = 'qty')}>Quantité totale</button>
+          <button type="button" class:sel={form.groupMode === 'count'} onclick={() => (form.groupMode = 'count')}
+            >Nombre de produits</button
+          >
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">Seuil du groupe « {form.group.trim()} » (ajout aux courses quand ≤)</span>
+        <div class="row">
+          <input bind:value={form.groupThreshold} inputmode="decimal" placeholder="Aucun" aria-label="Seuil du groupe" />
+          {#if form.groupMode === 'qty'}
+            <select bind:value={form.groupUnit} aria-label="Unité du groupe">
+              {#each UNITS as u}<option value={u}>{u}</option>{/each}
+            </select>
+          {:else}
+            <span class="u">produits</span>
+          {/if}
         </div>
       </div>
     {/if}

@@ -120,7 +120,7 @@ Styles globaux (variables de couleurs, boutons, fiches « sheet »).
 - `StockItem` (article en stock : name, qty/unit ou level, packs, locationId, categoryId, aisleId, seuil…), `ShoppingItem` (article de courses), `Category`, `Location`, `StoredLocation`, `Aisle` (rayon), `RecipeIngredient`, `Recipe`, `Product` (fiche code-barres en cache).
 
 ### `db.ts` — base de données
-- `db` : base Dexie `inmyfridge`. Tables : `stock`, `shopping`, `memory` (mots déjà tapés → rayon), `recipes`, `products` (cache code-barres), `locations`, `videos` (vidéos de recettes, non synchronisées), `snapshots` (copies locales, non synchronisées).
+- `db` : base Dexie `inmyfridge`. Tables : `stock`, `shopping`, `memory` (mots déjà tapés → rayon), `recipes`, `products` (cache code-barres), `locations`, `groups` (groupes de produits à seuil commun), `videos` (vidéos de recettes, non synchronisées), `snapshots` (copies locales, non synchronisées).
 - Versions de schéma 1 → 7 (`db.ts:39-60`). **Pour ajouter une table ou un index : ajouter `db.version(8).stores({...})`, ne jamais modifier une version existante.**
 - `newId()` — UUID. `requestPersistence()` — appelé par main.
 - Types `Memory`, `RecipeVideo`, `LocalSnapshot`.
@@ -144,14 +144,16 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 - `addItem(name, qty, aisleId?)` — ajoute ou fusionne avec un article existant non coché. Appelé par Home, Courses, ScanSheet, recipes (`addMissingToShopping`).
 - `updateItem`, `toggleItem`, `deleteItem` (logique), `clearChecked` — Courses, RestockSheet.
 - `suggestions(prefix)` — auto-complétion depuis `memory` — Courses.
-- `isLow(stockItem)` — article sous le seuil — Stock, `syncLowStock`.
-- `syncLowStock()` — ajoute aux courses les articles de stock bas. Appelé par stock.ts (après modif) et Courses.
+- `isLow(stockItem)` — article sous le seuil (toujours faux pour un article d'un groupe) — Stock, `syncLowStock`.
+- `groupTotal(group, stock)`, `isGroupLow(group, stock)`, `groupMembers` — total d'un groupe (somme convertie ou nombre de produits en stock) — Stock, `syncLowStock`.
+- `syncLowStock()` — ajoute aux courses les articles et groupes de stock bas. Appelé par stock.ts (après modif) et Courses.
 
 ### `stock.ts` — stock
 - `UNITS`, type `QtyKind`, `detectKind(input)`.
 - `parseStock("6 x 1 l lait")` → `{ name, qty, unit, packs }` — Stock, barcode, ocr.
 - `addStock(...)` — ajoute ou cumule ; devine rayon/emplacement/catégorie. Appelé par Home, Stock, ScanSheet.
 - `updateStock(id, changes)` (met à jour `updatedAt` puis `syncLowStock`), `deleteStock` — Stock, recipes (`cook`).
+- `saveGroup(name, settings)` — crée ou met à jour le groupe du même nom, retourne son id — Stock.
 - Paquets (« packs » = contenants entamés/non entamés) : `splitPacks`, `withQty`, `addPacks`, `formatPacks`.
 - `adjust(item, ±1)` — boutons +/− de Stock.
 - `formatQty`, `convert(qty, from, to)`.

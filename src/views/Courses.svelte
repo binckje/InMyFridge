@@ -13,6 +13,7 @@
     updateItem,
     parseShopping
   } from '../lib/shopping';
+  import { formatQty } from '../lib/stock';
   import type { ShoppingItem } from '../lib/types';
   import RestockSheet from './RestockSheet.svelte';
   import ScanSheet from './ScanSheet.svelte';
@@ -20,6 +21,13 @@
   let scanning = $state(false);
 
   const items = liveQuery(() => db.shopping.filter((i) => !i.deleted).toArray());
+  const stock = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
+  /** Détail d'un groupe ajouté aux courses : ce qu'il en reste en stock, produit par produit. */
+  const inGroup = (groupId: string) =>
+    ($stock ?? [])
+      .filter((s) => s.groupId === groupId)
+      .map((s) => `${s.name} ${formatQty(s)}`.trim())
+      .join(', ') || 'plus rien';
 
   const todo = $derived(($items ?? []).filter((i) => !i.checked));
   const done = $derived(($items ?? []).filter((i) => i.checked));
@@ -176,7 +184,8 @@
           <button class="label" onclick={() => edit(item)}>
             <span class="name">{item.name}</span>
             {#if item.qty}<span class="qty">{item.qty}</span>{/if}
-            {#if item.stockItemId}<span class="tag">stock bas</span>{/if}
+            {#if item.stockItemId || item.groupId}<span class="tag">stock bas</span>{/if}
+            {#if item.groupId}<span class="detail">en stock : {inGroup(item.groupId)}</span>{/if}
           </button>
         </li>
       {/each}
@@ -308,12 +317,14 @@
   .label {
     flex: 1;
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: 8px;
+    gap: 2px 8px;
     padding: 14px 14px 14px 0;
     text-align: left;
   }
   .qty { color: var(--muted); font-size: 15px; }
+  .detail { flex-basis: 100%; color: var(--muted); font-size: 13px; }
   .tag {
     margin-left: auto;
     padding: 1px 8px;

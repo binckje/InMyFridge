@@ -16,7 +16,8 @@ export async function lastLocalChange(): Promise<number> {
     db.shopping.orderBy('updatedAt').last(),
     db.recipes.orderBy('updatedAt').last(),
     db.products.orderBy('updatedAt').last(),
-    db.locations.orderBy('updatedAt').last()
+    db.locations.orderBy('updatedAt').last(),
+    db.groups.orderBy('updatedAt').last()
   ]);
   const memory = await db.memory.orderBy('lastUsed').last();
   return Math.max(0, memory?.lastUsed ?? 0, ...last.map((r) => r?.updatedAt ?? 0));

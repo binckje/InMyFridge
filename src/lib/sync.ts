@@ -1,5 +1,5 @@
 import { db, type Memory } from './db';
-import type { Product, Recipe, ShoppingItem, StockItem, StoredLocation } from './types';
+import type { Product, Recipe, ShoppingItem, StockGroup, StockItem, StoredLocation } from './types';
 
 /** Contenu du fichier de synchro partagé entre tous les appareils du foyer. */
 export interface Snapshot {
@@ -12,6 +12,7 @@ export interface Snapshot {
   recipes?: Recipe[];
   products?: Product[];
   locations?: StoredLocation[];
+  groups?: StockGroup[];
 }
 
 /**
@@ -61,13 +62,14 @@ export async function syncWith(provider: SyncProvider): Promise<SyncResult> {
 
 async function syncOnce(provider: SyncProvider): Promise<number> {
   const remote = await provider.read();
-  const [stock, shopping, memory, recipes, products, locations] = await Promise.all([
+  const [stock, shopping, memory, recipes, products, locations, groups] = await Promise.all([
     db.stock.toArray(),
     db.shopping.toArray(),
     db.memory.toArray(),
     db.recipes.toArray(),
     db.products.toArray(),
-    db.locations.toArray()
+    db.locations.toArray(),
+    db.groups.toArray()
   ]);
 
   const s = mergeBy(stock, remote?.stock ?? [], (i) => i.id, (i) => i.updatedAt);
@@ -76,14 +78,16 @@ async function syncOnce(provider: SyncProvider): Promise<number> {
   const r = mergeBy(recipes, remote?.recipes ?? [], (i) => i.id, (i) => i.updatedAt);
   const p = mergeBy(products, remote?.products ?? [], (i) => i.code, (i) => i.updatedAt);
   const l = mergeBy(locations, remote?.locations ?? [], (i) => i.id, (i) => i.updatedAt);
+  const g = mergeBy(groups, remote?.groups ?? [], (i) => i.id, (i) => i.updatedAt);
 
-  await db.transaction('rw', [db.stock, db.shopping, db.memory, db.recipes, db.products, db.locations], async () => {
+  await db.transaction('rw', [db.stock, db.shopping, db.memory, db.recipes, db.products, db.locations, db.groups], async () => {
     await db.stock.bulkPut(s.changed);
     await db.shopping.bulkPut(sh.changed);
     await db.memory.bulkPut(m.changed);
     await db.recipes.bulkPut(r.changed);
     await db.products.bulkPut(p.changed);
     await db.locations.bulkPut(l.changed);
+    await db.groups.bulkPut(g.changed);
   });
 
   await provider.write({
@@ -94,8 +98,9 @@ async function syncOnce(provider: SyncProvider): Promise<number> {
     memory: m.all,
     recipes: r.all,
     products: p.all,
-    locations: l.all
+    locations: l.all,
+    groups: g.all
   });
 
-  return s.changed.length + sh.changed.length + m.changed.length + r.changed.length + p.changed.length + l.changed.length;
+  return s.changed.length + sh.changed.length + m.changed.length + r.changed.length + p.changed.length + l.changed.length + g.changed.length;
 }
