@@ -116,6 +116,12 @@ const DIM: Record<Unit, [string, number]> = {
 /** Produit encore en stock : quantité > 0, ou niveau au-dessus de « plus beaucoup ». */
 const inStock = (s: StockItem) => (s.level ? s.level !== 'plus beaucoup' : (s.qty ?? 0) > 0);
 
+/** Produit épuisé : quantité à 0 (ou count à 0 pour un produit suivi par niveau). */
+export const isOut = (s: StockItem) => (s.level ? s.count === 0 : (s.qty ?? 0) <= 0);
+
+/** Groupe épuisé : total à 0. */
+export const isGroupOut = (g: StockGroup, stock: StockItem[]) => groupTotal(g, stock) <= 0;
+
 export const groupMembers = (g: StockGroup, stock: StockItem[]) => stock.filter((s) => !s.deleted && s.groupId === g.id);
 
 /**

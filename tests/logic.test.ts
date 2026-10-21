@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/lib/db';
 import { guessAisle } from '../src/lib/aisles';
 import { addStock, adjust, formatQty, parseStock, saveGroup, updateStock } from '../src/lib/stock';
-import { addItem, groupTotal, isEmptyUntracked, isLow, syncLowStock } from '../src/lib/shopping';
+import { addItem, groupTotal, isEmptyUntracked, isLow, isOut, syncLowStock } from '../src/lib/shopping';
 import { syncWith, type Snapshot, type SyncProvider } from '../src/lib/sync';
 
 beforeEach(async () => {
@@ -241,5 +241,15 @@ describe('produits épuisés sans seuil', () => {
     expect(isEmptyUntracked({ ...base, level: 'plus beaucoup' }, [])).toBe(false);
     expect(isEmptyUntracked({ ...base, qty: 0, groupId: 'g' }, [g])).toBe(false);
     expect(isEmptyUntracked({ ...base, qty: 0, groupId: 'g' }, [{ ...g, threshold: undefined }])).toBe(true);
+  });
+});
+
+describe('produit épuisé', () => {
+  const base = { id: 'x', updatedAt: 0, name: 'x', locationId: 'frigo', aisleId: 'a' };
+  it('inexistant à 0, stock bas sinon', () => {
+    expect(isOut({ ...base, qty: 0, unit: 'g' })).toBe(true);
+    expect(isOut({ ...base, qty: 50, unit: 'g' })).toBe(false);
+    expect(isOut({ ...base, level: 'plus beaucoup' })).toBe(false);
+    expect(isOut({ ...base, level: 'moyen', count: 0 })).toBe(true);
   });
 });

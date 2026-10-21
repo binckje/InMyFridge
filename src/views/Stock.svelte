@@ -4,7 +4,7 @@
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
-  import { isEmptyUntracked, isGroupLow, isLow } from '../lib/shopping';
+  import { isEmptyUntracked, isGroupLow, isLow, isOut } from '../lib/shopping';
   import {
     UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
   } from '../lib/stock';
@@ -346,7 +346,7 @@
         <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }} class:flash={flash === s.id}>
           <button class="label" onclick={() => edit(s)}>
             <span class="name">{s.name}</span>
-            {#if isBas(s)}<span class="tag">bas</span>{/if}
+            {#if isBas(s)}<span class="tag">{isOut(s) ? 'inexistant' : 'stock bas'}</span>{/if}
           </button>
           <div class="stepper">
             <button onclick={() => step(s, -1)} disabled={atMin(s)} aria-label="Moins de {s.name}">−</button>
