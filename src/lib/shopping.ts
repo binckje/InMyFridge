@@ -89,6 +89,16 @@ export async function suggestions(prefix: string, limit = 6): Promise<Memory[]> 
 
 /* ---------- Lien stock → courses ---------- */
 
+/**
+ * Produit épuisé (quantité à 0) sans aucun seuil d'alerte, ni le sien ni celui de son groupe :
+ * masqué dans le stock, sauf lors d'une recherche.
+ */
+export function isEmptyUntracked(s: StockItem, groups: StockGroup[]): boolean {
+  if (s.level || (s.qty ?? 0) > 0) return false;
+  if (s.groupId) return !groups.some((g) => g.id === s.groupId && !g.deleted && g.threshold != null);
+  return s.thresholdQty == null && s.thresholdPacks == null && s.thresholdLevel == null && s.thresholdCount == null;
+}
+
 /** Produit sous son propre seuil (un produit d'un groupe ne compte que via le seuil du groupe). */
 export function isLow(s: StockItem): boolean {
   if (s.deleted || s.groupId) return false;

@@ -4,7 +4,7 @@
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
-  import { isGroupLow, isLow } from '../lib/shopping';
+  import { isEmptyUntracked, isGroupLow, isLow } from '../lib/shopping';
   import {
     UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
   } from '../lib/stock';
@@ -30,14 +30,16 @@
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   const low = $derived(all.filter(isBas));
+  /** Produits épuisés sans seuil : masqués sauf pendant une recherche. */
+  const visible = $derived(all.filter((s) => !isEmptyUntracked(s, $stockGroups ?? [])));
   const shown = $derived(
-    all.filter(
+    (text.trim() ? all : visible).filter(
       (s) =>
         (filter === 'tout' || (filter === 'bas' ? isBas(s) : s.locationId === filter)) &&
         (!text.trim() || norm(s.name).includes(norm(parseStock(text.trim()).name)))
     )
   );
-  const count = (locId: string) => all.filter((s) => s.locationId === locId).length;
+  const count = (locId: string) => visible.filter((s) => s.locationId === locId).length;
 
   /** Regroupement : par sous-catégorie dans un emplacement, sinon par emplacement. */
   const groups = $derived.by(() => {
