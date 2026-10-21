@@ -7,6 +7,8 @@
   import {
     addItem,
     deleteItem,
+    isGroupOut,
+    isOut,
     suggestions,
     syncLowStock,
     toggleItem,
@@ -22,6 +24,17 @@
 
   const items = liveQuery(() => db.shopping.filter((i) => !i.deleted).toArray());
   const stock = liveQuery(() => db.stock.filter((s) => !s.deleted).toArray());
+  const stockGroups = liveQuery(() => db.groups.filter((g) => !g.deleted).toArray());
+  /** Seuil atteint : « inexistant » si plus rien en stock, sinon « stock bas ». */
+  const lowTag = (item: ShoppingItem) => {
+    const all = $stock ?? [];
+    if (item.groupId) {
+      const g = ($stockGroups ?? []).find((g) => g.id === item.groupId);
+      return g && isGroupOut(g, all) ? 'inexistant' : 'stock bas';
+    }
+    const s = all.find((s) => s.id === item.stockItemId);
+    return s && isOut(s) ? 'inexistant' : 'stock bas';
+  };
   /** Détail d'un groupe ajouté aux courses : ce qu'il en reste en stock, produit par produit. */
   const inGroup = (groupId: string) =>
     ($stock ?? [])
@@ -184,7 +197,7 @@
           <button class="label" onclick={() => edit(item)}>
             <span class="name">{item.name}</span>
             {#if item.qty}<span class="qty">{item.qty}</span>{/if}
-            {#if item.stockItemId || item.groupId}<span class="tag">stock bas</span>{/if}
+            {#if item.stockItemId || item.groupId}<span class="tag">{lowTag(item)}</span>{/if}
             {#if item.groupId}<span class="detail">en stock : {inGroup(item.groupId)}</span>{/if}
           </button>
         </li>
