@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/lib/db';
 import { guessAisle } from '../src/lib/aisles';
 import { addStock, adjust, formatQty, parseStock, saveGroup, updateStock } from '../src/lib/stock';
-import { addItem, groupTotal, isEmptyUntracked, isLow, isOut, syncLowStock } from '../src/lib/shopping';
+import { addItem, dismissItem, groupTotal, isEmptyUntracked, isLow, isOut, syncLowStock } from '../src/lib/shopping';
 import { syncWith, type Snapshot, type SyncProvider } from '../src/lib/sync';
 
 beforeEach(async () => {
@@ -55,6 +55,24 @@ describe('stock', () => {
     await syncLowStock();
     list = (await db.shopping.toArray()).filter((i) => !i.deleted);
     expect(list).toHaveLength(0);
+  });
+
+  it('retiré volontairement → pas rajouté tant que le stock reste bas', async () => {
+    const s = (await addStock('beurre', 'frigo'))!;
+    await adjust(s, -1);
+    await adjust({ ...s, level: 'moyen' }, -1);
+    const todo = async () => (await db.shopping.toArray()).filter((i) => !i.deleted);
+    const [item] = await todo();
+    await dismissItem(item.id);
+    await syncLowStock();
+    expect(await todo()).toHaveLength(0);
+    // Stock remonté puis redescendu : de nouveau proposé.
+    const low = (await db.stock.get(s.id))!;
+    await adjust(low, 1);
+    await syncLowStock();
+    await adjust((await db.stock.get(s.id))!, -1);
+    await syncLowStock();
+    expect((await todo()).map((i) => i.name)).toEqual(['beurre']);
   });
 });
 

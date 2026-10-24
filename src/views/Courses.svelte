@@ -6,7 +6,7 @@
   import { AISLES, aisleById } from '../lib/aisles';
   import {
     addItem,
-    deleteItem,
+    dismissItem,
     isGroupOut,
     isOut,
     suggestions,
@@ -116,13 +116,13 @@
   let undoTimer: ReturnType<typeof setTimeout>;
   async function remove(item: ShoppingItem) {
     editing = null;
-    await deleteItem(item.id);
+    await dismissItem(item.id);
     undo = { id: item.id, name: item.name };
     clearTimeout(undoTimer);
     undoTimer = setTimeout(() => (undo = null), 4000);
   }
   async function restore() {
-    if (undo) await updateItem(undo.id, { deleted: false });
+    if (undo) await updateItem(undo.id, { deleted: false, dismissed: false });
     undo = null;
   }
 
@@ -200,6 +200,7 @@
             {#if item.stockItemId || item.groupId}<span class="tag">{lowTag(item)}</span>{/if}
             {#if item.groupId}<span class="detail">en stock : {inGroup(item.groupId)}</span>{/if}
           </button>
+          <button class="remove" onclick={() => remove(item)} aria-label="Retirer {item.name} (ne pas racheter)">✕</button>
         </li>
       {/each}
     </ul>
@@ -347,6 +348,14 @@
     font-size: 12px;
     font-weight: 600;
   }
+  .remove {
+    flex: none;
+    align-self: stretch;
+    width: 44px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .remove:active { color: var(--danger); }
   .basket .name { text-decoration: line-through; color: var(--muted); }
   .clear { display: block; margin: 12px auto 0; }
 
