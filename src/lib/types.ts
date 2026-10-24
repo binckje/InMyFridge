@@ -66,6 +66,8 @@ export interface ShoppingItem extends SyncFields {
   stockItemId?: string;
   /** Ajouté automatiquement car ce groupe du stock est sous son seuil. */
   groupId?: string;
+  /** Retiré volontairement : n'est plus rajouté automatiquement tant que le stock reste sous le seuil. */
+  dismissed?: boolean;
 }
 
 export interface Category {

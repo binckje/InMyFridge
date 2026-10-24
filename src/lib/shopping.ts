@@ -70,6 +70,9 @@ export const toggleItem = (item: ShoppingItem) => updateItem(item.id, { checked:
 
 export const deleteItem = (id: string) => updateItem(id, { deleted: true });
 
+/** Retiré par l'utilisateur : on ne souhaite pas en racheter, donc pas de ré-ajout automatique. */
+export const dismissItem = (id: string) => updateItem(id, { deleted: true, dismissed: true });
+
 export async function clearChecked() {
   const now = Date.now();
   await db.shopping
@@ -153,11 +156,17 @@ export async function syncLowStock(): Promise<number> {
   const stock = await db.stock.toArray();
   const list = (await db.shopping.toArray()).filter((i) => !i.deleted && !i.checked);
   const linked = new Map(list.filter((i) => i.stockItemId).map((i) => [i.stockItemId!, i]));
+  const refused = (await db.shopping.toArray()).filter((i) => i.deleted && i.dismissed);
+  // Stock remonté au-dessus du seuil : le refus est levé, le produit pourra revenir à la prochaine baisse.
+  const lift = async (match: (i: ShoppingItem) => boolean) => {
+    for (const i of refused.filter(match)) await updateItem(i.id, { dismissed: false });
+  };
   let added = 0;
   for (const s of stock) {
     const low = isLow(s);
     const entry = linked.get(s.id);
-    if (low && !entry && !list.some((i) => keyOf(i.name) === keyOf(s.name))) {
+    const isRefused = refused.some((i) => i.stockItemId === s.id);
+    if (low && !entry && !isRefused && !list.some((i) => keyOf(i.name) === keyOf(s.name))) {
       const now = Date.now();
       await db.shopping.add({
         id: newId(),
@@ -172,12 +181,14 @@ export async function syncLowStock(): Promise<number> {
     } else if (!low && entry) {
       await deleteItem(entry.id);
     }
+    if (!low && isRefused) await lift((i) => i.stockItemId === s.id);
   }
   const byGroup = new Map(list.filter((i) => i.groupId).map((i) => [i.groupId!, i]));
   for (const g of await db.groups.toArray()) {
     const low = isGroupLow(g, stock);
     const entry = byGroup.get(g.id);
-    if (low && !entry && !list.some((i) => keyOf(i.name) === keyOf(g.name))) {
+    const isRefused = refused.some((i) => i.groupId === g.id);
+    if (low && !entry && !isRefused && !list.some((i) => keyOf(i.name) === keyOf(g.name))) {
       const now = Date.now();
       await db.shopping.add({
         id: newId(),
@@ -192,6 +203,7 @@ export async function syncLowStock(): Promise<number> {
     } else if (!low && entry) {
       await deleteItem(entry.id);
     }
+    if (!low && isRefused) await lift((i) => i.groupId === g.id);
   }
   return added;
 }
