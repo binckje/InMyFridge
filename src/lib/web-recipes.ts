@@ -53,6 +53,9 @@ for (const [en, fr] of Object.entries(EN_FR)) {
 /** Traduction d'un ingrédient anglais (inconnu → laissé tel quel). */
 export const toFrench = (en: string) => EN_FR[en.trim().toLowerCase()] ?? en.trim().toLowerCase();
 
+/** Ingrédient anglais dont la traduction est connue (comparaison au stock possible). */
+export const isKnown = (en: string) => en.trim().toLowerCase() in EN_FR;
+
 /** Ingrédient français → anglais, pour chercher par ingrédient. */
 export function toEnglish(fr: string): string | undefined {
   const t = tokens(fr);
@@ -107,7 +110,7 @@ export function measure(m: string): Pick<RecipeIngredient, 'qty' | 'unit'> {
   return { qty, unit: 'pièce' };
 }
 
-interface Meal {
+export interface Meal {
   idMeal: string;
   strMeal: string;
   strMealThumb?: string;
@@ -152,10 +155,37 @@ export async function ideasFromStock(names: string[], limit = 4): Promise<WebHit
   return [...score.values()].sort((a, b) => b.n - a.n).slice(0, 30).map((s) => hit(s.m));
 }
 
+/** Noms anglais des ingrédients d'une recette TheMealDB. */
+const rawIngredients = (m: Meal) =>
+  Array.from({ length: 20 }, (_, i) => m[`strIngredient${i + 1}`]?.trim()).filter((n): n is string => !!n);
+
+/**
+ * Liste d'ingrédients fiable : au moins 3 ingrédients, tous traduits.
+ * Sinon on ne peut pas dire avec certitude ce qui manque.
+ */
+export const isReliable = (m: Meal) => {
+  const names = rawIngredients(m);
+  return names.length >= 3 && names.every(isKnown);
+};
+
 /** Recette complète, convertie au format de l'app (non enregistrée). */
 export async function fetchWebRecipe(id: string): Promise<Recipe | null> {
   const [m] = await get(`lookup.php?i=${encodeURIComponent(id)}`);
-  if (!m) return null;
+  return m ? convert(m) : null;
+}
+
+/**
+ * Détail des premiers résultats, en ne gardant que les recettes dont la liste
+ * d'ingrédients est fiable (voir isReliable). Les échecs réseau sont ignorés.
+ */
+export async function fetchReliable(hits: WebHit[], limit = 15): Promise<Recipe[]> {
+  const meals = await Promise.all(
+    hits.slice(0, limit).map((h) => get(`lookup.php?i=${encodeURIComponent(h.id)}`).then(([m]) => m, () => undefined))
+  );
+  return meals.filter((m): m is Meal => !!m && isReliable(m)).map(convert);
+}
+
+function convert(m: Meal): Recipe {
   const ingredients: RecipeIngredient[] = [];
   for (let i = 1; i <= 20; i++) {
     const name = m[`strIngredient${i}`]?.trim();

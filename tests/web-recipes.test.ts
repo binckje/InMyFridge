@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchWebRecipe, ideasFromStock, measure, toEnglish, toFrench } from '../src/lib/web-recipes';
+import { fetchReliable, fetchWebRecipe, ideasFromStock, isReliable, measure, toEnglish, toFrench } from '../src/lib/web-recipes';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -67,5 +67,28 @@ describe('TheMealDB', () => {
     })));
     const hits = await ideasFromStock(['poulet', 'riz basmati', 'truc']);
     expect(hits.map((h) => h.name)).toEqual(['B', 'A']);
+  });
+
+  it('ne garde que les recettes aux ingrédients fiables', async () => {
+    const meal = (id: string, ...ings: string[]) => ({
+      idMeal: id,
+      strMeal: `R${id}`,
+      ...Object.fromEntries(ings.map((n, i) => [`strIngredient${i + 1}`, n]))
+    });
+    const meals: Record<string, object | null> = {
+      '1': meal('1', 'Chicken', 'Rice', 'Garlic'),
+      '2': meal('2', 'Chicken', 'Rice'),
+      '3': meal('3', 'Chicken', 'Rice', 'Garam Masala'),
+      '4': null
+    };
+    expect(isReliable(meal('1', 'Chicken', 'Rice', 'Garlic'))).toBe(true);
+    expect(isReliable(meal('3', 'Chicken', 'Rice', 'Garam Masala'))).toBe(false);
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const id = new URL(url).searchParams.get('i')!;
+      if (id === '5') throw new Error('réseau');
+      return { ok: true, json: async () => ({ meals: meals[id] ? [meals[id]] : null }) };
+    }));
+    const list = await fetchReliable(['1', '2', '3', '4', '5'].map((id) => ({ id, name: id })));
+    expect(list.map((r) => r.id)).toEqual(['web-1']);
   });
 });
