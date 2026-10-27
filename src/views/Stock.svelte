@@ -4,11 +4,12 @@
   import { flip } from 'svelte/animate';
   import { db } from '../lib/db';
   import { LOCATIONS, categoryOf, locationById } from '../lib/locations.svelte';
+  import type { Location } from '../lib/types';
   import { isEmptyUntracked, isGroupLow, isLow, isOut } from '../lib/shopping';
   import {
     UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
   } from '../lib/stock';
-  import { LEVELS, type Level, type StockItem, type Unit } from '../lib/types';
+  import { LEVELS, type Category, type Level, type StockItem, type Unit } from '../lib/types';
   import ScanSheet from './ScanSheet.svelte';
   import LocationsSheet from './LocationsSheet.svelte';
 
@@ -26,6 +27,19 @@
   /* ---------- Filtres ---------- */
   type Filter = 'tout' | 'bas' | string;
   let filter = $state<Filter>('tout');
+  /** Filtre par sous-catégorie (id), tous emplacements confondus sauf si un emplacement est choisi. */
+  let cat = $state<string | null>(null);
+  /** Sous-catégories de tous les emplacements, sans doublon (même id = même sous-catégorie). */
+  const allCategories = $derived.by(() => {
+    const seen = new Map<string, Category>();
+    for (const l of LOCATIONS) for (const c of l.categories ?? []) if (!seen.has(c.id)) seen.set(c.id, c);
+    return [...seen.values()];
+  });
+  // Sous-catégorie absente de l'emplacement choisi : on la retire.
+  $effect(() => {
+    if (cat && target && !target.categories?.some((c) => c.id === cat)) cat = null;
+  });
+  const catOf = (s: StockItem) => categoryOf(locationById(s.locationId), s.categoryId)?.id;
   let text = $state('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -36,29 +50,41 @@
     (text.trim() ? all : visible).filter(
       (s) =>
         (filter === 'tout' || (filter === 'bas' ? isBas(s) : s.locationId === filter)) &&
+        (!cat || catOf(s) === cat) &&
         (!text.trim() || norm(s.name).includes(norm(parseStock(text.trim()).name)))
     )
   );
   const count = (locId: string) => visible.filter((s) => s.locationId === locId).length;
 
-  /** Regroupement : par sous-catégorie dans un emplacement, sinon par emplacement. */
-  const groups = $derived.by(() => {
-    const loc = LOCATIONS.find((l) => l.id === filter);
-    if (loc?.categories?.length) {
-      return loc.categories
-        .map((c) => ({
-          key: c.id,
-          title: `${c.emoji} ${c.label}`,
-          items: shown.filter((s) => categoryOf(loc, s.categoryId)?.id === c.id)
-        }))
-        .filter((g) => g.items.length);
+  type Group = { key: string; title: string; items: StockItem[]; subs?: Group[] };
+  /** Découpe les produits d'un emplacement par sous-catégorie. */
+  const byCategory = (loc: Location, items: StockItem[]): Group[] =>
+    (loc.categories ?? [])
+      .map((c) => ({
+        key: `${loc.id}/${c.id}`,
+        title: `${c.emoji} ${c.label}`,
+        items: items.filter((s) => categoryOf(loc, s.categoryId)?.id === c.id)
+      }))
+      .filter((g) => g.items.length);
+
+  /**
+   * Regroupement : filtre sous-catégorie = une seule liste (tous emplacements) ;
+   * emplacement choisi = par sous-catégorie ; sinon par emplacement puis sous-catégorie.
+   */
+  const groups = $derived.by((): Group[] => {
+    if (cat) {
+      const c = allCategories.find((c) => c.id === cat);
+      return shown.length ? [{ key: `cat/${cat}`, title: c ? `${c.emoji} ${c.label}` : '', items: shown }] : [];
     }
-    return LOCATIONS.map((l) => ({
-      key: l.id,
-      title: `${l.emoji} ${l.label}`,
-      items: shown.filter((s) => locationById(s.locationId).id === l.id)
-    })).filter((g) => g.items.length);
+    const loc = LOCATIONS.find((l) => l.id === filter);
+    if (loc?.categories?.length) return byCategory(loc, shown);
+    return LOCATIONS.map((l) => {
+      const items = shown.filter((s) => locationById(s.locationId).id === l.id);
+      return { key: l.id, title: `${l.emoji} ${l.label}`, items, subs: l.categories?.length ? byCategory(l, items) : undefined };
+    }).filter((g) => g.items.length);
   });
+  /** Icône d'emplacement à côté du produit quand la liste mélange les emplacements. */
+  const showLoc = $derived(!!cat && !LOCATIONS.some((l) => l.id === filter));
 
   /** Sections repliées (clé de groupe), mémorisées localement. */
   const FOLD_KEY = 'imf.stock.folded';
@@ -290,6 +316,15 @@
   <button class="chip gear" onclick={() => (configuring = true)} aria-label="Configurer les emplacements">⚙️</button>
 </div>
 
+{#if (filter === 'tout' || filter === 'bas' || target?.categories?.length) && (target?.categories ?? allCategories).length}
+  <div class="locs cats">
+    <button class="chip" class:sel={!cat} onclick={() => (cat = null)}>Toutes</button>
+    {#each target?.categories ?? allCategories as c (c.id)}
+      <button class="chip" class:sel={cat === c.id} onclick={() => (cat = cat === c.id ? null : c.id)}>{c.emoji} {c.label}</button>
+    {/each}
+  </div>
+{/if}
+
 <form class="add" onsubmit={submit}>
   <input
     bind:value={text}
@@ -332,6 +367,46 @@
   </div>
 {/if}
 
+{#snippet list(items: StockItem[])}
+  <ul transition:slide={{ duration: 200 }}>
+    {#each items as s (s.id)}
+      <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }} class:flash={flash === s.id}>
+        <button class="label" onclick={() => edit(s)}>
+          {#if showLoc}<span class="loc" title={locationById(s.locationId).label}>{locationById(s.locationId).emoji}</span>{/if}
+          <span class="name">{s.name}</span>
+          {#if isBas(s)}<span class="tag">{isOut(s) ? 'inexistant' : 'stock bas'}</span>{/if}
+        </button>
+        <div class="stepper">
+          <button onclick={() => step(s, -1)} disabled={atMin(s)} aria-label="Moins de {s.name}">−</button>
+          {#if s.level}
+            <span class="qty lvl" data-level={s.level}>{formatQty(s)}</span>
+          {:else if typing === s.id}
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="qty qty-input"
+              bind:value={typed}
+              inputmode="decimal"
+              autofocus
+              use:focus
+              aria-label="Quantité de {s.name}"
+              onblur={() => commitTyped(s)}
+              onkeydown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                else if (e.key === 'Escape') typing = null;
+              }}
+            />
+          {:else}
+            <button class="qty" onclick={() => startTyping(s)} aria-label="Modifier la quantité de {s.name}"
+              >{formatQty(s)}{#if s.packs}<small>{formatPacks(s)}</small>{/if}</button
+            >
+          {/if}
+          <button onclick={() => step(s, 1)} disabled={atMax(s)} aria-label="Plus de {s.name}">+</button>
+        </div>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
 {#each groups as g (g.key)}
   <section transition:slide={{ duration: 200 }}>
     <h2>
@@ -341,42 +416,19 @@
       </button>
     </h2>
     {#if !folded.includes(g.key)}
-    <ul transition:slide={{ duration: 200 }}>
-      {#each g.items as s (s.id)}
-        <li animate:flip={{ duration: 200 }} out:fly={{ x: 60, duration: 200 }} class:flash={flash === s.id}>
-          <button class="label" onclick={() => edit(s)}>
-            <span class="name">{s.name}</span>
-            {#if isBas(s)}<span class="tag">{isOut(s) ? 'inexistant' : 'stock bas'}</span>{/if}
-          </button>
-          <div class="stepper">
-            <button onclick={() => step(s, -1)} disabled={atMin(s)} aria-label="Moins de {s.name}">−</button>
-            {#if s.level}
-              <span class="qty lvl" data-level={s.level}>{formatQty(s)}</span>
-            {:else if typing === s.id}
-              <!-- svelte-ignore a11y_autofocus -->
-              <input
-                class="qty qty-input"
-                bind:value={typed}
-                inputmode="decimal"
-                autofocus
-                use:focus
-                aria-label="Quantité de {s.name}"
-                onblur={() => commitTyped(s)}
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') e.currentTarget.blur();
-                  else if (e.key === 'Escape') typing = null;
-                }}
-              />
-            {:else}
-              <button class="qty" onclick={() => startTyping(s)} aria-label="Modifier la quantité de {s.name}"
-                >{formatQty(s)}{#if s.packs}<small>{formatPacks(s)}</small>{/if}</button
-              >
-            {/if}
-            <button onclick={() => step(s, 1)} disabled={atMax(s)} aria-label="Plus de {s.name}">+</button>
-          </div>
-        </li>
-      {/each}
-    </ul>
+      {#if g.subs}
+        {#each g.subs as sub (sub.key)}
+          <h3>
+            <button class="fold" onclick={() => toggleFold(sub.key)} aria-expanded={!folded.includes(sub.key)}>
+              <span class="chev" class:closed={folded.includes(sub.key)}>▾</span>
+              {sub.title} <span>{sub.items.length}</span>
+            </button>
+          </h3>
+          {#if !folded.includes(sub.key)}{@render list(sub.items)}{/if}
+        {/each}
+      {:else}
+        {@render list(g.items)}
+      {/if}
     {/if}
   </section>
 {/each}
@@ -612,7 +664,11 @@
     letter-spacing: 0.04em;
     color: var(--muted);
   }
-  h2 span { font-weight: 400; }
+  h2 span, h3 span { font-weight: 400; }
+  h3 { margin: 10px 0 6px 12px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .cats { margin-top: 8px; }
+  .cats .chip { padding: 4px 10px; font-size: 14px; }
+  .loc { flex: none; font-size: 15px; }
   .fold {
     all: unset;
     cursor: pointer;
