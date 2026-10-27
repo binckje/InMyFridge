@@ -160,7 +160,7 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 - `planRestock(items)` / `applyRestock(lines)` + type `RestockLine` — remise en stock des articles cochés aux courses. RestockSheet.
 
 ### `recipes.ts` — recettes et correspondance avec le stock
-- `tokens(name)` — normalise un nom en mots (sans accents, singulier). Utilisé par Recettes (recherche), web-recipes.
+- `tokens(name)` — normalise un nom en mots (sans accents, singulier, synonymes `SYNONYMS` : soya → soja, maïzena → fécule de maïs…). Utilisé par Recettes (recherche), web-recipes.
 - Correspondance ingrédient ↔ stock : `matchKind` (`'exact' | 'substitute' | 'close'`), `matches`, `isBasic` (sel, poivre…).
 - `parseIngredient("200 g farine")`, `formatIngredient(ing, scale)`, `qtyLabel` — RecipeEditor, RecipeSheet, recipe-import, web-recipes, recipe-export.
 - `checkIngredient`, `checkRecipe(recipe, stock, scale, useClose)` → `RecipeCheck` (statut `ok/low/missing/basic` par ingrédient) — RecipeSheet.
@@ -232,6 +232,7 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 ### `web-recipes.ts` — recettes internet (TheMealDB, en anglais)
 - `toFrench`, `toEnglish`, `measure` — traduction ingrédients/mesures.
 - `searchWeb(query)`, `ideasFromStock(names)` → `WebHit[]`, `fetchWebRecipe(id)` → `Recipe` (id `web-<id>`). Recettes.
+- `EN_FR` : dictionnaire anglais → français ; recherche tolérante aux pluriels anglais (`lookup`).
 - `isKnown(en)`, `isReliable(meal)` (≥ 3 ingrédients, tous traduits), `fetchReliable(hits, 15)` → `Recipe[]` fiables seulement. Recettes : affiche les manquants + bouton 🛒 ; recette acceptée enregistrée avec lien + ingrédients, sans les étapes.
 
 ---

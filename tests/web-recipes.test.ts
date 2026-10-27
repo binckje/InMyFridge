@@ -6,11 +6,15 @@ afterEach(() => vi.unstubAllGlobals());
 describe('traduction', () => {
   it('fr ↔ en', () => {
     expect(toEnglish('Pâtes')).toBe('pasta');
-    expect(toEnglish('blanc de poulet')).toBeUndefined();
+    expect(toEnglish('blanc de poulet')).toBe('chicken');
     expect(toEnglish('poulet fermier')).toBe('chicken');
     expect(toEnglish('oeufs')).toBe('egg');
     expect(toFrench('Minced Beef')).toBe('boeuf haché');
     expect(toFrench('Quinoa')).toBe('quinoa');
+    expect(toFrench('Tomatoes')).toBe('tomates');
+    expect(toFrench('Spring Onions')).toBe('cébette');
+    expect(toFrench('Blueberries')).toBe('myrtilles');
+    expect(toFrench('Chicken Thighs')).toBe('poulet');
   });
 });
 
@@ -78,11 +82,11 @@ describe('TheMealDB', () => {
     const meals: Record<string, object | null> = {
       '1': meal('1', 'Chicken', 'Rice', 'Garlic'),
       '2': meal('2', 'Chicken', 'Rice'),
-      '3': meal('3', 'Chicken', 'Rice', 'Garam Masala'),
+      '3': meal('3', 'Chicken', 'Rice', 'Quinoa'),
       '4': null
     };
     expect(isReliable(meal('1', 'Chicken', 'Rice', 'Garlic'))).toBe(true);
-    expect(isReliable(meal('3', 'Chicken', 'Rice', 'Garam Masala'))).toBe(false);
+    expect(isReliable(meal('3', 'Chicken', 'Rice', 'Quinoa'))).toBe(false);
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const id = new URL(url).searchParams.get('i')!;
       if (id === '5') throw new Error('réseau');
