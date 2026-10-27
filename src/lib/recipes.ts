@@ -37,7 +37,7 @@ const COMPOUNDS = [
 
 const singular = (w: string) => (w.length > 3 && /[sx]$/.test(w) ? w.slice(0, -1) : w);
 
-const base = (s: string) =>
+const normalizeName = (s: string) =>
   s
     .toLowerCase()
     .replace(/œ/g, 'oe')
@@ -49,6 +49,52 @@ const base = (s: string) =>
     .split(/\s+/)
     .map(singular)
     .join(' ');
+
+/**
+ * Synonymes stricts : autre nom du même produit, ramené au nom de référence
+ * (« sauce soya » → sauce soja, « maïzena » → fécule de maïs).
+ */
+const SYNONYMS: [string, string][] = (
+  [
+    ['soya', 'soja'],
+    ['maïzena', 'fécule de maïs'],
+    ['maizena', 'fécule de maïs'],
+    ['crème fleurette', 'crème liquide'],
+    ['crème entière liquide', 'crème liquide'],
+    ['crème épaisse', 'crème fraîche'],
+    ['ciboule', 'cébette'],
+    ['oignon nouveau', 'cébette'],
+    ['yogourt', 'yaourt'],
+    ['yoghourt', 'yaourt'],
+    ['yoghurt', 'yaourt'],
+    ['sucre impalpable', 'sucre glace'],
+    ['huile neutre', 'huile'],
+    ['poivre noir', 'poivre'],
+    ['extrait de vanille', 'vanille'],
+    ['gousse de vanille', 'vanille'],
+    ['champignon de paris', 'champignon'],
+    ['steak haché', 'boeuf haché'],
+    ['viande hachée', 'boeuf haché'],
+    ['blanc de poulet', 'poulet'],
+    ['filet de poulet', 'poulet'],
+    ['escalope de poulet', 'poulet'],
+    ['cuisse de poulet', 'poulet'],
+    ['parmigiano', 'parmesan'],
+    ['noix de coco râpée', 'noix de coco'],
+    ['coco râpée', 'noix de coco'],
+    ['nuoc mam', 'sauce poisson'],
+    ['nuoc-mâm', 'sauce poisson'],
+    ['sauce nuoc mam', 'sauce poisson'],
+    ['lard fumé', 'lardons'],
+    ['coriandre fraîche', 'coriandre']
+  ] as const
+).map(([from, to]) => [normalizeName(from), normalizeName(to)]);
+
+const base = (s: string) => {
+  let r = ` ${normalizeName(s)} `;
+  for (const [from, to] of SYNONYMS) r = r.replaceAll(` ${from} `, ` ${to} `);
+  return r.trim();
+};
 
 /** Mots significatifs d'un nom (pluriels ramenés au singulier, noms composés soudés). */
 export function tokens(name: string): string[] {

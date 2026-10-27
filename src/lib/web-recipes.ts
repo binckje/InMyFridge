@@ -40,7 +40,36 @@ const EN_FR: Record<string, string> = {
   'baking powder': 'levure', yeast: 'levure', vanilla: 'vanille', 'vanilla extract': 'vanille',
   'soy sauce': 'sauce soja', mustard: 'moutarde', 'dijon mustard': 'moutarde', vinegar: 'vinaigre', 'white wine': 'vin blanc', 'red wine': 'vin rouge',
   cumin: 'cumin', paprika: 'paprika', 'curry powder': 'curry', cinnamon: 'cannelle', nutmeg: 'muscade', thyme: 'thym', 'bay leaf': 'laurier', 'bay leaves': 'laurier',
-  parsley: 'persil', basil: 'basilic', coriander: 'coriandre', 'chilli powder': 'piment', chilli: 'piment', ginger: 'gingembre', oregano: 'origan', rosemary: 'romarin'
+  parsley: 'persil', basil: 'basilic', coriander: 'coriandre', 'chilli powder': 'piment', chilli: 'piment', ginger: 'gingembre', oregano: 'origan', rosemary: 'romarin',
+  // Ingrédients fréquents sur TheMealDB
+  'spring onion': 'cébette', scallion: 'cébette', 'green onion': 'cébette', 'cherry tomato': 'tomates cerises', 'plum tomato': 'tomates',
+  'fish sauce': 'sauce poisson', 'oyster sauce': 'sauce huître', 'worcestershire sauce': 'sauce worcestershire', 'hot sauce': 'sauce piquante',
+  'tomato ketchup': 'ketchup', ketchup: 'ketchup', mayonnaise: 'mayonnaise', 'sesame oil': 'huile de sésame', 'sesame seed': 'graines de sésame',
+  'rice vinegar': 'vinaigre de riz', 'white wine vinegar': 'vinaigre', 'red wine vinegar': 'vinaigre', 'balsamic vinegar': 'vinaigre balsamique', 'cider vinegar': 'vinaigre de cidre',
+  'coconut cream': 'crème de coco', 'condensed milk': 'lait concentré', 'cream cheese': 'fromage frais', 'whipping cream': 'crème liquide', cream: 'crème liquide',
+  'plain yogurt': 'yaourt', 'natural yogurt': 'yaourt', ricotta: 'ricotta', mascarpone: 'mascarpone', 'goat cheese': 'chèvre', 'gruyere': 'gruyère', 'cheddar': 'cheddar',
+  'garam masala': 'garam masala', turmeric: 'curcuma', 'ground cumin': 'cumin', 'cumin seed': 'cumin', 'ground coriander': 'coriandre', 'coriander seed': 'coriandre',
+  cardamom: 'cardamome', clove: 'clou de girofle', 'star anise': 'anis étoilé', 'cayenne pepper': 'piment de cayenne', 'chilli flake': 'piment', 'red chilli': 'piment', 'green chilli': 'piment',
+  'smoked paprika': 'paprika', 'mixed spice': 'quatre-épices', allspice: 'quatre-épices', 'dried oregano': 'origan', sage: 'sauge', dill: 'aneth', mint: 'menthe', chive: 'ciboulette', tarragon: 'estragon',
+  'fresh thyme': 'thym', 'garlic powder': 'ail', 'onion powder': 'oignon', 'sea salt': 'sel', 'black pepper corn': 'poivre', 'white pepper': 'poivre',
+  'self raising flour': 'farine', cornflour: 'fécule de maïs', cornstarch: 'fécule de maïs', 'corn flour': 'fécule de maïs', 'bicarbonate of soda': 'bicarbonate', 'baking soda': 'bicarbonate',
+  'muscovado sugar': 'cassonade', 'light brown soft sugar': 'cassonade', 'dark brown soft sugar': 'cassonade', 'golden syrup': 'sirop', 'maple syrup': "sirop d'érable",
+  'milk chocolate': 'chocolat au lait', 'white chocolate': 'chocolat blanc', 'dark chocolate chip': 'chocolat noir', almond: 'amandes', 'ground almond': 'amandes en poudre',
+  walnut: 'noix', hazelnut: 'noisettes', peanut: 'cacahuètes', 'peanut butter': 'beurre de cacahuète', 'pine nut': 'pignons de pin', raisin: 'raisins secs', sultana: 'raisins secs',
+  oat: "flocons d'avoine", 'rolled oat': "flocons d'avoine", couscous: 'semoule', 'egg noodle': 'nouilles', 'rice noodle': 'nouilles de riz', 'jasmine rice': 'riz',
+  tortilla: 'tortillas', 'flour tortilla': 'tortillas', pitta: 'pain pita', 'pita bread': 'pain pita', 'white bread': 'pain', 'filo pastry': 'pâte filo',
+  'black bean': 'haricots noirs', 'cannellini bean': 'haricots blancs', 'butter bean': 'haricots blancs', 'baked bean': 'haricots blancs', sweetcorn: 'maïs', corn: 'maïs',
+  'red pepper flake': 'piment', 'red bell pepper': 'poivrons', 'green bell pepper': 'poivrons', squash: 'courge', 'butternut squash': 'butternut', pumpkin: 'potiron',
+  cauliflower: 'chou-fleur', kale: 'chou kale', asparagus: 'asperges', beetroot: 'betterave', radish: 'radis', fennel: 'fenouil', parsnip: 'panais', turnip: 'navet',
+  'baby spinach': 'épinards', rocket: 'roquette', watercress: 'cresson', olive: 'olives', 'black olive': 'olives', 'green olive': 'olives', caper: 'câpres',
+  'lemon zest': 'citron', 'lime juice': 'jus de citron vert', 'orange juice': "jus d'orange", pear: 'poires', mango: 'mangue', pineapple: 'ananas', blueberry: 'myrtilles',
+  'beef stock cube': 'bouillon', 'chicken stock cube': 'bouillon', 'vegetable stock cube': 'bouillon', 'stock cube': 'bouillon',
+  'chicken thigh': 'poulet', 'chicken leg': 'poulet', 'chicken wing': 'poulet', 'whole chicken': 'poulet', turkey: 'dinde', duck: 'canard',
+  'pork belly': 'poitrine de porc', 'pork loin': 'porc', 'pork mince': 'porc haché', 'minced pork': 'porc haché', 'lamb mince': 'agneau', 'lamb shoulder': 'agneau', 'lamb leg': 'agneau',
+  'beef fillet': 'boeuf', 'stewing beef': 'boeuf', 'beef mince': 'boeuf haché', steak: 'boeuf', 'sirloin steak': 'boeuf', 'streaky bacon': 'lardons', pancetta: 'lardons', prosciutto: 'jambon cru',
+  'smoked salmon': 'saumon fumé', 'king prawn': 'crevettes', 'tiger prawn': 'crevettes', mussel: 'moules', squid: 'calamars', haddock: 'églefin', mackerel: 'maquereau', sardine: 'sardines', anchovy: 'anchois',
+  tofu: 'tofu', 'dry white wine': 'vin blanc', beer: 'bière', brandy: 'cognac', rum: 'rhum', 'ice cream': 'glace',
+  'free-range egg': 'oeufs', 'egg yolk': 'oeufs', 'cold water': 'eau', 'boiling water': 'eau', 'warm water': 'eau', 'salted butter': 'beurre', 'semi-skimmed milk': 'lait', 'whole milk': 'lait'
 };
 
 /** Français → anglais : premier terme anglais simple rencontré (« pâtes » → pasta). */
@@ -50,8 +79,18 @@ for (const [en, fr] of Object.entries(EN_FR)) {
   if (!(k in FR_EN) && (!en.includes(' ') || en === 'minced beef')) FR_EN[k] = en;
 }
 
+/** Clé du dictionnaire : telle quelle, sinon au singulier (« tomatoes » → tomato, « berries » → berry) ou au pluriel. */
+function lookup(en: string): string | undefined {
+  const k = en.trim().toLowerCase().replace(/\s+/g, ' ');
+  for (const c of [k, k.replace(/ies$/, 'y'), k.replace(/(ch|sh|ss|x|o)es$/, '$1'), k.replace(/s$/, ''), `${k}s`])
+    if (Object.hasOwn(EN_FR, c)) return EN_FR[c];
+}
+
 /** Traduction d'un ingrédient anglais (inconnu → laissé tel quel). */
-export const toFrench = (en: string) => EN_FR[en.trim().toLowerCase()] ?? en.trim().toLowerCase();
+export const toFrench = (en: string) => lookup(en) ?? en.trim().toLowerCase();
+
+/** Ingrédient anglais dont la traduction est connue (comparaison au stock possible). */
+export const isKnown = (en: string) => lookup(en) !== undefined;
 
 /** Ingrédient français → anglais, pour chercher par ingrédient. */
 export function toEnglish(fr: string): string | undefined {
@@ -107,7 +146,7 @@ export function measure(m: string): Pick<RecipeIngredient, 'qty' | 'unit'> {
   return { qty, unit: 'pièce' };
 }
 
-interface Meal {
+export interface Meal {
   idMeal: string;
   strMeal: string;
   strMealThumb?: string;
@@ -152,10 +191,37 @@ export async function ideasFromStock(names: string[], limit = 4): Promise<WebHit
   return [...score.values()].sort((a, b) => b.n - a.n).slice(0, 30).map((s) => hit(s.m));
 }
 
+/** Noms anglais des ingrédients d'une recette TheMealDB. */
+const rawIngredients = (m: Meal) =>
+  Array.from({ length: 20 }, (_, i) => m[`strIngredient${i + 1}`]?.trim()).filter((n): n is string => !!n);
+
+/**
+ * Liste d'ingrédients fiable : au moins 3 ingrédients, tous traduits.
+ * Sinon on ne peut pas dire avec certitude ce qui manque.
+ */
+export const isReliable = (m: Meal) => {
+  const names = rawIngredients(m);
+  return names.length >= 3 && names.every(isKnown);
+};
+
 /** Recette complète, convertie au format de l'app (non enregistrée). */
 export async function fetchWebRecipe(id: string): Promise<Recipe | null> {
   const [m] = await get(`lookup.php?i=${encodeURIComponent(id)}`);
-  if (!m) return null;
+  return m ? convert(m) : null;
+}
+
+/**
+ * Détail des premiers résultats, en ne gardant que les recettes dont la liste
+ * d'ingrédients est fiable (voir isReliable). Les échecs réseau sont ignorés.
+ */
+export async function fetchReliable(hits: WebHit[], limit = 15): Promise<Recipe[]> {
+  const meals = await Promise.all(
+    hits.slice(0, limit).map((h) => get(`lookup.php?i=${encodeURIComponent(h.id)}`).then(([m]) => m, () => undefined))
+  );
+  return meals.filter((m): m is Meal => !!m && isReliable(m)).map(convert);
+}
+
+function convert(m: Meal): Recipe {
   const ingredients: RecipeIngredient[] = [];
   for (let i = 1; i <= 20; i++) {
     const name = m[`strIngredient${i}`]?.trim();

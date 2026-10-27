@@ -234,3 +234,13 @@ describe('titres de préparation', () => {
     expect(c.feasible).toBe(true);
   });
 });
+
+describe('synonymes', () => {
+  it('autre nom du même produit', () => {
+    expect(matchKind('sauce soya', 'Sauce soja')).toBe('exact');
+    expect(matchKind('maïzena', 'Fécule de maïs')).toBe('exact');
+    expect(matchKind('crème fleurette', 'Crème liquide')).toBe('exact');
+    expect(matchKind('blanc de poulet', 'Poulet')).toBe('exact');
+    expect(matchKind('yogourt nature', 'Yaourt')).toBe('exact');
+  });
+});

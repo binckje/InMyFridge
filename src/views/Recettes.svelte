@@ -4,8 +4,8 @@
   import { flip } from 'svelte/animate';
   import { thumb } from '../lib/media';
   import { db } from '../lib/db';
-  import { CATEGORIES, categoryOf, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
-  import { fetchWebRecipe, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
+  import { addMissingToShopping, CATEGORIES, categoryOf, checkRecipe, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
+  import { fetchReliable, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
   import RecipeEditor from './RecipeEditor.svelte';
@@ -142,7 +142,13 @@
   }
 
   /* ---------- Internet ---------- */
-  let web = $state<{ title: string; hits: WebHit[] } | null>(null);
+  /** Recettes internet dont la liste d'ingrédients est fiable (voir fetchReliable). */
+  let web = $state.raw<{ title: string; recipes: Recipe[] } | null>(null);
+  const webChecks = $derived(
+    (web?.recipes ?? []).map((r) => checkRecipe(r, $stock ?? [])).sort((a, b) => a.missing.length - b.missing.length || b.score - a.score)
+  );
+  /** Nombre d'articles ajoutés aux courses, par recette internet. */
+  let shopped = $state<Record<string, number>>({});
   let webBusy = $state(false);
   let webError = $state('');
   let preview = $state.raw<Recipe | null>(null);
@@ -151,7 +157,8 @@
     webBusy = true;
     webError = '';
     try {
-      web = { title, hits: await search() };
+      web = { title, recipes: await fetchReliable(await search()) };
+      shopped = {};
     } catch {
       webError = 'Recherche impossible : vérifie la connexion internet.';
     } finally {
@@ -166,22 +173,20 @@
     web = null;
   });
 
-  async function openWeb(h: WebHit) {
-    if (($recipes ?? []).some((r) => r.id === `web-${h.id}`)) return (openId = `web-${h.id}`);
-    webBusy = true;
-    try {
-      preview = await fetchWebRecipe(h.id);
-    } catch {
-      webError = 'Recette introuvable : vérifie la connexion internet.';
-    } finally {
-      webBusy = false;
-    }
+  function openWeb(r: Recipe) {
+    if (($recipes ?? []).some((x) => x.id === r.id && !x.deleted)) return (openId = r.id);
+    preview = r;
   }
 
+  async function shopWeb(c: RecipeCheck) {
+    shopped = { ...shopped, [c.recipe.id]: await addMissingToShopping(c) };
+  }
+
+  /** Fiche acceptée : on garde le lien et les ingrédients, pas les étapes (lues via le lien). */
   async function savePreview() {
     if (!preview) return;
     const { id, createdAt, updatedAt, ...rest } = preview;
-    openId = await saveRecipe({ ...rest, id });
+    openId = await saveRecipe({ ...rest, id, steps: [] });
     preview = null;
   }
 
@@ -304,17 +309,29 @@
   {#if webBusy}<p class="hint">Recherche…</p>{/if}
   {#if webError}<p class="err">{webError}</p>{/if}
   {#if web}
-    <h2>{web.title} <span>{web.hits.length}</span></h2>
-    {#if !web.hits.length}
-      <p class="hint">Rien trouvé. Les recettes internet sont en anglais : essaie un ingrédient (« poulet ») ou un plat (« curry »).</p>
+    <h2>{web.title} <span>{webChecks.length}</span></h2>
+    {#if !webChecks.length}
+      <p class="hint">Rien trouvé avec une liste d'ingrédients fiable. Les recettes internet sont en anglais : essaie un ingrédient (« poulet ») ou un plat (« curry »).</p>
     {/if}
     <ul class="cards">
-      {#each web.hits as h (h.id)}
+      {#each webChecks as c (c.recipe.id)}
         <li>
-          <button class="card" onclick={() => openWeb(h)}>
-            {#if h.image}<img src="{h.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">🌐</span>{/if}
-            <span class="body"><span class="name">{h.name}</span></span>
+          <button class="card" onclick={() => openWeb(c.recipe)}>
+            {#if c.recipe.image}<img src="{c.recipe.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">🌐</span>{/if}
+            <span class="body">
+              <span class="name">{c.recipe.name}</span>
+              {#if c.feasible}
+                <span class="status ok">✅ Faisable</span>
+              {:else}
+                <span class="status miss">Manque {c.missing.length} : {c.missing.map((m) => m.ingredient.name).join(', ')}</span>
+              {/if}
+            </span>
           </button>
+          {#if c.missing.length}
+            <button class="btn ghost shop" onclick={() => shopWeb(c)} disabled={c.recipe.id in shopped}>
+              {c.recipe.id in shopped ? `✓ ${shopped[c.recipe.id]} ajouté${shopped[c.recipe.id] > 1 ? 's' : ''} aux courses` : `🛒 Ajouter ${c.missing.length} manquant${c.missing.length > 1 ? 's' : ''} aux courses`}
+            </button>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -460,6 +477,7 @@
   .web h2 { margin: 10px 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
   .web h2 span { font-weight: 400; }
   .web .btn:disabled { opacity: 0.5; }
+  .web .shop { margin-top: 4px; width: 100%; font-size: 13px; }
   .card img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; }
   .hint { margin: 0; color: var(--muted); font-size: 14px; }
   .err { margin: 0; color: var(--danger); font-size: 14px; }
