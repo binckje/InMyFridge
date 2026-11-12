@@ -144,8 +144,23 @@ const QUALIFIERS = new Set(
  * peut remplacer l'ingrédient (farine T45 ⇄ farine T55…).
  */
 const VARIANTS: Record<string, Set<string>> = {
-  farine: new Set(['t45', 't55', 't65', 't80', 't110', 't150', 'fluide', 'complete', 'patissiere', 'gateau', 'pain'])
+  farine: new Set(['t45', 't55', 't65', 't80', 't110', 't150', 'fluide', 'complete', 'patissiere', 'gateau', 'pain']),
+  cannelle: new Set(['baton', 'ecorce', 'moulu', 'moulue', 'entiere'])
 };
+
+/**
+ * Conditionnement ou forme du produit, pas le produit lui-même (« bâton de cannelle » ⇄ cannelle en
+ * poudre, « feuille de laurier » ⇄ laurier). Seule la forme diffère : le produit du stock dépanne,
+ * et la correspondance est signalée comme remplacement.
+ */
+const FORMS = new Set(
+  (
+    'bâton branche brin feuille gousse tranche rondelle lamelle morceau éclat copeau zeste écorce tête ' +
+    'botte pied moulu moulue concassé concassée entière'
+  )
+    .split(' ')
+    .map(base)
+);
 
 /**
  * Familles d'un produit : même famille = même produit (cassonade ⇄ sucre roux) ;
@@ -196,6 +211,8 @@ function matchOne(ingredient: string, st: Set<string>): MatchKind | undefined {
   if (!miss.length) return otherFamily ? 'close' : 'exact';
   const v = ing.find((w) => VARIANTS[w] && st.has(w));
   if (v && miss.every((w) => VARIANTS[v].has(w))) return 'substitute';
+  // Seule la forme manque (« bâton » de cannelle) et le produit lui-même est en stock.
+  if (miss.every((w) => FORMS.has(w)) && ing.some((w) => !FORMS.has(w) && st.has(w))) return 'substitute';
   return st.has(head) ? 'close' : undefined;
 }
 
@@ -274,7 +291,7 @@ function needIn(ing: RecipeIngredient, scale: number, dim: 'm' | 'v' | 'n'): num
 }
 
 const UNIT_RE =
-  '(kg|g|ml|cl|l|c\\.? ?à ?s(?:oupe)?\\.?|c\\.? ?à ?c(?:afé)?\\.?|cs|cc|cuill(?:ère|ere)s? à (?:soupe|café)|pincées?|sachets?|cubes?|pavés?|tranches?|gousses?|boîtes?|brins?|feuilles?|verres?|bols?|filets?|morceaux?|noix|botte?s?)';
+  '(kg|g|ml|cl|l|c\\.? ?à ?s(?:oupe)?\\.?|c\\.? ?à ?c(?:afé)?\\.?|cs|cc|cuill(?:ère|ere)s? à (?:soupe|café)|pincées?|sachets?|cubes?|pavés?|tranches?|gousses?|b[âa]tons?|branches?|boîtes?|brins?|feuilles?|verres?|bols?|filets?|morceaux?|noix|botte?s?)';
 
 /** « 200 g de farine », « 3 oeufs », « 1 c. à soupe d'huile », « sel » → ingrédient structuré. */
 export function parseIngredient(line: string): RecipeIngredient {

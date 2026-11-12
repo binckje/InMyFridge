@@ -69,6 +69,14 @@ describe('matches', () => {
     expect(matches('huile', "huile de tournesol")).toBe(true);
     expect(matches('emmental', 'comté')).toBe(false);
   });
+  it('forme du produit : la cannelle en poudre remplace le bâton', () => {
+    expect(matches('bâton de cannelle', 'cannelle en poudre')).toBe(true);
+    expect(matchKind('bâton de cannelle', 'cannelle en poudre')).toBe('substitute');
+    expect(matchKind('cannelle moulue', 'bâtons de cannelle')).toBe('substitute');
+    expect(matchKind('feuilles de laurier', 'laurier')).toBe('substitute');
+    expect(matchKind('laurier', 'feuilles de laurier')).toBe('exact');
+    expect(matches('bâton de cannelle', 'cardamome')).toBe(false);
+  });
   it('noms composés', () => {
     expect(matches('pommes', 'pommes de terre')).toBe(false);
     expect(matches('pommes de terre', 'pomme de terre')).toBe(true);
