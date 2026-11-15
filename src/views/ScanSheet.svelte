@@ -5,7 +5,9 @@
   import { AISLES, guessAisle } from '../lib/aisles';
   import { LOCATIONS, guessLocation } from '../lib/locations.svelte';
   import { addItem } from '../lib/shopping';
-  import { addStock } from '../lib/stock';
+  import type { QtyKind } from '../lib/stock';
+  import type { StockItem } from '../lib/types';
+  import AddStockSheet from './AddStockSheet.svelte';
   import type { Product } from '../lib/types';
 
   /** Scan de code-barres → fiche produit → ajout au stock (ou à la liste de courses). */
@@ -139,6 +141,12 @@
     return `${String(Math.round(n * 1000) / 1000).replace('.', ',')} ${m[2]}`.trim();
   }
 
+  /** Ajout au stock en attente de réponse (groupe, produit similaire) dans AddStockSheet. */
+  type Pending = { input: string; locationId?: string; kind?: QtyKind; aisle?: string; resolve: (s?: StockItem) => void };
+  let pending = $state<Pending | null>(null);
+  const askAdd = (input: string, locationId?: string, kind?: QtyKind, aisle?: string) =>
+    new Promise<StockItem | undefined>((resolve) => (pending = { input, locationId, kind, aisle, resolve }));
+
   async function add(e: SubmitEvent) {
     e.preventDefault();
     const name = form.name.trim();
@@ -154,8 +162,10 @@
       locationId: form.locationId,
       image: form.image.startsWith('blob:') ? undefined : form.image || undefined
     });
-    if (mode === 'stock') await addStock(`${name} ${total()}`, form.locationId, undefined, form.aisleId);
-    else await addItem(name, form.count > 1 ? `x${form.count}` : '', form.aisleId);
+    if (mode === 'stock') {
+      // annulé dans la feuille d'ajout : on reste sur le formulaire
+      if (!(await askAdd(`${name} ${total()}`, form.locationId, undefined, form.aisleId))) return;
+    } else await addItem(name, form.count > 1 ? `x${form.count}` : '', form.aisleId);
     navigator.vibrate?.(12);
     last = { code, at: Date.now() };
     added = name;
@@ -285,6 +295,18 @@
     </form>
   {/if}
 </div>
+
+{#if pending}
+  {#key pending}
+    <AddStockSheet
+      input={pending.input}
+      locationId={pending.locationId}
+      kind={pending.kind}
+      aisle={pending.aisle}
+      onclose={(s) => { pending?.resolve(s); pending = null; }}
+    />
+  {/key}
+{/if}
 
 <style>
   .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 40; }

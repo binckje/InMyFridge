@@ -155,7 +155,8 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 ### `stock.ts` — stock
 - `UNITS`, type `QtyKind`, `detectKind(input)`.
 - `parseStock("6 x 1 l lait")` → `{ name, qty, unit, packs }` — Stock, barcode, ocr.
-- `addStock(...)` — ajoute ou cumule ; devine rayon/emplacement/catégorie. Appelé par Home, Stock, ScanSheet.
+- `addStock(input, locationId?, kind?, aisle?, options?)` — ajoute ou cumule ; devine rayon/emplacement/catégorie. `options.groupId` range le nouveau produit dans un groupe, `options.mergeInto` verse la quantité dans un produit similaire existant. Appelé par AddStockSheet, `applyRestock`.
+- `checkAdd(...)` — avant ajout : produit identique (`exact`), groupes, produits similaires. `similarInStock(name, stock)` — similarité par mot commun. AddStockSheet.
 - `updateStock(id, changes)` (met à jour `updatedAt` puis `syncLowStock`), `deleteStock` — Stock, recipes (`cook`).
 - `saveGroup(name, settings)` — crée ou met à jour le groupe du même nom, retourne son id — Stock.
 - Paquets (« packs » = contenants entamés/non entamés) : `splitPacks`, `withQty`, `addPacks`, `formatPacks`.
@@ -267,6 +268,7 @@ Relais sans dépendance, collé dans le tableau de bord Cloudflare. Routes `/`, 
 | `SourcesSheet.svelte` | Réglages des sources internet : adresse du Worker + test, TheMealDB / YouTube / Edamam, sites (activer, ajouter, retirer) | web-sources | Recettes |
 | `ExportSheet.svelte` | Choix du format d'export | `FORMATS`, `exportBlob`, `saveFile` | Recettes |
 | `ScanSheet.svelte` | Scan code-barres (caméra ou photo), photo d'emballage (OCR), saisie manuelle, puis ajout au stock ou aux courses | barcode, ocr, `AISLES`, `guessAisle`, `LOCATIONS`, `guessLocation`, `addItem`, `addStock` | Home, Stock, Courses |
+| `AddStockSheet.svelte` | Passage de tout ajout au stock : choix d'un groupe, alerte produit similaire (Oui → liste → quantité versée dans le produit choisi). Rien à demander → ajout direct | `checkAdd`, `addStock`, `formatQty`, `locationById` | Home, Stock, ScanSheet |
 | `RestockSheet.svelte` | Après les courses : quantités achetées → stock | `planRestock`, `applyRestock`, `formatQty`, `clearChecked` | Courses |
 | `LocationsSheet.svelte` | Gérer emplacements et catégories (ajout, renommage, ordre, suppression) | locations.svelte.ts | Stock |
 | `SyncSheet.svelte` | Google Drive (connexion, créer/choisir fichier, synchro), télécharger/importer sauvegarde JSON, copies locales | drive, `syncWith`, backup, safety | App (bouton ☁️) |
@@ -277,7 +279,7 @@ Convention des fiches (« sheets ») : props `onclose` (et parfois `ondone`), af
 
 ## 7. Parcours typiques (pour déboguer)
 
-- **Ajouter au stock** : Home/Stock/ScanSheet → `parseStock` → `addStock` → `aisleFor` + `guessLocation/guessCategory` → `db.stock` → `syncLowStock`.
+- **Ajouter au stock** : Home/Stock/ScanSheet → AddStockSheet (`checkAdd` : groupe ? similaire ?) → `addStock` → `aisleFor` + `guessLocation/guessCategory` → `db.stock` → `syncLowStock`.
 - **Cocher une course puis ranger** : Courses `toggleItem` → bouton « ranger » → RestockSheet `planRestock` → `applyRestock` (→ `addStock`/`updateStock`) → `clearChecked`.
 - **Stock bas → courses** : `updateStock` → `syncLowStock` → `isLow` → `addItem`.
 - **Suggestion de recettes** : Recettes `rank(recipes, stock)` → `checkRecipe` → `checkIngredient` → `matchKind`/`tokens`.

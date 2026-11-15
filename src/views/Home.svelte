@@ -2,7 +2,9 @@
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
   import { addItem, parseShopping } from '../lib/shopping';
-  import { addStock } from '../lib/stock';
+  import type { QtyKind } from '../lib/stock';
+  import type { StockItem } from '../lib/types';
+  import AddStockSheet from './AddStockSheet.svelte';
   import ScanSheet from './ScanSheet.svelte';
 
   /** Accueil : accès aux onglets + ajout rapide au stock et aux courses sans changer d'onglet. */
@@ -25,12 +27,20 @@
     timer = setTimeout(() => (done = null), 2000);
   }
 
+  /** Ajout au stock en attente de réponse (groupe, produit similaire) dans AddStockSheet. */
+  type Pending = { input: string; locationId?: string; kind?: QtyKind; aisle?: string; resolve: (s?: StockItem) => void };
+  let pending = $state<Pending | null>(null);
+  const askAdd = (input: string, locationId?: string, kind?: QtyKind, aisle?: string) =>
+    new Promise<StockItem | undefined>((resolve) => (pending = { input, locationId, kind, aisle, resolve }));
+
   async function addToStock(e: SubmitEvent) {
     e.preventDefault();
     const input = stockText.trim();
     stockText = '';
-    const added = input && (await addStock(input));
+    if (!input) return;
+    const added = await askAdd(input);
     if (added) confirm('stock', added.name);
+    else if (!stockText) stockText = input; // annulé : la saisie revient
   }
 
   async function addToShopping(e: SubmitEvent) {
@@ -88,6 +98,18 @@
 
 {#if scanning}
   <ScanSheet mode={scanning} onclose={() => (scanning = null)} />
+{/if}
+
+{#if pending}
+  {#key pending}
+    <AddStockSheet
+      input={pending.input}
+      locationId={pending.locationId}
+      kind={pending.kind}
+      aisle={pending.aisle}
+      onclose={(s) => { pending?.resolve(s); pending = null; }}
+    />
+  {/key}
 {/if}
 
 <style>
