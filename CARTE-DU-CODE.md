@@ -1,6 +1,6 @@
 # InMyFridge — Carte du code
 
-_Dernière mise à jour : 2026-10-18_
+_Dernière mise à jour : 2026-11-15_
 
 But : permettre de reprendre le projet sans accès GitHub. Pour chaque fichier : rôle, fonctions exportées, qui l'appelle, ce qu'il appelle. Les numéros de ligne sont indicatifs (`fichier:ligne`).
 
@@ -22,6 +22,7 @@ npm run build                # build de production dans dist/
 Variables d'environnement (lues dans `src/lib/drive.ts:8-10`) :
 - `VITE_GOOGLE_CLIENT_ID` — connexion Google (OAuth)
 - `VITE_GOOGLE_API_KEY` + `VITE_GOOGLE_APP_ID` — Google Picker (choisir un fichier existant)
+- `VITE_WORKER_URL` — adresse par défaut du Worker Cloudflare (`src/lib/web-sources.ts`), facultatif
 
 Déploiement : `.github/workflows/deploy.yml` → GitHub Pages (`base = /InMyFridge/` quand `GITHUB_ACTIONS` est défini, voir `vite.config.ts:39`).
 
@@ -36,7 +37,7 @@ index.html
          ├─ views/Home.svelte       (Accueil : ajout rapide)
          ├─ views/Stock.svelte      (Stock)      ── LocationsSheet, ScanSheet
          ├─ views/Courses.svelte    (Courses)    ── RestockSheet, ScanSheet
-         ├─ views/Recettes.svelte   (Recettes)   ── RecipeSheet, RecipeEditor, ExportSheet
+         ├─ views/Recettes.svelte   (Recettes)   ── RecipeSheet, RecipeEditor, ExportSheet, SourcesSheet
          └─ views/SyncSheet.svelte  (fenêtre ☁️ : Drive, sauvegardes, copies locales)
 
 src/lib/  = logique métier, sans interface
@@ -45,7 +46,9 @@ src/lib/  = logique métier, sans interface
   stock.ts / shopping.ts / recipes.ts / locations.svelte.ts / aisles.ts   métier
   sync.ts / drive.ts / autosync.ts / backup.ts / safety.ts               sauvegarde & synchro
   barcode.ts / ocr.ts / media.ts                                        caméra, photos, vidéos
-  recipe-import.ts / recipe-export.ts / web-recipes.ts / recipes-seed.ts recettes externes
+  recipe-import.ts / recipe-export.ts / web-recipes.ts / web-sources.ts / recipes-seed.ts recettes externes
+
+worker/worker.js = Worker Cloudflare (hors de l'app, déployé à la main : worker/README.md)
 ```
 
 Principes communs :
@@ -79,9 +82,10 @@ Principes communs :
 | `lib/barcode.ts` | db, aisles, stock, types | ScanSheet |
 | `lib/ocr.ts` | stock | ScanSheet, Recettes (import dynamique) |
 | `lib/media.ts` | db | Recettes, RecipeSheet, RecipeEditor |
-| `lib/recipe-import.ts` | recipes, types | Recettes |
+| `lib/recipe-import.ts` | recipes, types | Recettes, web-sources |
 | `lib/recipe-export.ts` | recipes, types | ExportSheet |
-| `lib/web-recipes.ts` | recipes, types | Recettes |
+| `lib/web-recipes.ts` | recipes, types | web-sources |
+| `lib/web-sources.ts` | recipes, recipe-import, web-recipes, types | Recettes, SourcesSheet |
 
 > Attention : `autosync ↔ safety ↔ drive` et `backup ↔ safety ↔ sync` forment des boucles d'import ; ne pas ajouter d'appel au niveau module (hors fonction) entre ces fichiers.
 
@@ -230,10 +234,23 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 - `exportBlob(recipes, format)`, `saveFile(blob, name)` (partage iOS ou téléchargement). ExportSheet.
 
 ### `web-recipes.ts` — recettes internet (TheMealDB, en anglais)
-- `toFrench`, `toEnglish`, `measure` — traduction ingrédients/mesures.
+- `toFrench`, `toEnglish`, `frenchFood` (aliment décrit librement, pour Edamam), `measure` — traduction ingrédients/mesures.
 - `searchWeb(query)`, `ideasFromStock(names)` → `WebHit[]`, `fetchWebRecipe(id)` → `Recipe` (id `web-<id>`). Recettes.
+- `loadCatalog()` / `englishNames(fr, cat)` (internes) — le filtre TheMealDB exige le nom exact (« carrots », pas « carrot ») : les noms viennent de leur liste `list.php?i=list`, comparée au stock via `matches`. `ideasFromStock` couvre tout le stock (24 requêtes max).
 - `EN_FR` : dictionnaire anglais → français ; recherche tolérante aux pluriels anglais (`lookup`).
-- `isKnown(en)`, `isReliable(meal)` (≥ 3 ingrédients, tous traduits), `fetchReliable(hits, 15)` → `Recipe[]` fiables seulement. Recettes : affiche les manquants + bouton 🛒 ; recette acceptée enregistrée avec lien + ingrédients, sans les étapes.
+- `isKnown(en)`, `isReliable(meal)` (≥ 3 ingrédients, tous traduits), `fetchReliable(hits, 40)` → `Recipe[]` fiables seulement. Recettes : affiche les manquants + bouton 🛒 ; recette acceptée enregistrée avec lien + ingrédients, sans les étapes.
+
+### `web-sources.ts` — sources internet et recherche unifiée
+- Réglages par appareil (localStorage `imf.sources`) : `Sources` { worker, mealdb, youtube, edamam, sites[] }, `Site` { name, domain, search?, on }, `getSources`, `saveSources`, `defaultSources`, `cleanDomain`. SourcesSheet.
+- `workerStatus(worker)` — route `/` du Worker. `NoWorker` : adresse non renseignée.
+- `fromSchema(json, url)` — bloc schema.org/Recipe → `Recipe` (id `site-<hash>`), avec `plain` (HTML → texte) et `minutes` (durée ISO).
+- `importUrl(url)` — recette d'un lien (route `/recipe`). Recettes (fiche « Ajouter »).
+- `fromVideo(video)` — vidéo YouTube → `Recipe` (id `yt-<id>`), seulement si la description annonce « Ingrédients ».
+- `fromEdamam(item)` — recette Edamam → `Recipe` (id `edamam-<id>`), refusée si un ingrédient n'est pas traduisible.
+- `searchAll(query)`, `ideasAll(stockNames)` → `WebResult` { recipes, errors } sur toutes les sources activées ; `sourceLabel(recipe)`. Recettes.
+
+### `worker/worker.js` — Worker Cloudflare (hors build)
+Relais sans dépendance, collé dans le tableau de bord Cloudflare. Routes `/`, `/recipe`, `/search`, `/youtube`, `/edamam` ; secrets `YOUTUBE_KEY`, `EDAMAM_ID`, `EDAMAM_KEY` ; origine vérifiée (`ALLOWED_ORIGINS`). Fonctions testées : `recipesIn(html)`, `links(html, base, domain, words)`. Notice : `worker/README.md`.
 
 ---
 
@@ -244,9 +261,10 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 | `Home.svelte` | Accueil : 2 champs d'ajout rapide (stock / courses), compteurs, raccourcis vers onglets, bouton scan | db, `addItem`, `parseShopping`, `addStock`, ScanSheet | App |
 | `Stock.svelte` | Liste du stock par emplacement/catégorie, recherche, +/−, saisie directe de quantité, édition, paquets, annuler suppression | db, `LOCATIONS`, `categoryOf`, `locationById`, `isLow`, `UNITS`, `addStock`, `detectKind`, `adjust`, `deleteStock`, `formatPacks`, `formatQty`, `parseStock`, `splitPacks`, `updateStock`, `withQty`, ScanSheet, LocationsSheet | App |
 | `Courses.svelte` | Liste de courses groupée par rayon, auto-complétion, cocher, édition, annuler, « remettre en stock » | db, `AISLES`, `aisleById`, `addItem`, `deleteItem`, `suggestions`, `syncLowStock`, `toggleItem`, `updateItem`, `parseShopping`, RestockSheet, ScanSheet | App |
-| `Recettes.svelte` | Liste triée (`rank`), filtres catégorie, recherche, sélection multiple (catégoriser/supprimer/exporter), import fichier/photo, recherche internet | `thumb`, db, `CATEGORIES`, `categoryOf`, `deleteRecipe`, `rank`, `saveRecipe`, `setCategory`, `tokens`, web-recipes, recipe-import, `readPhoto` (dynamique), RecipeSheet, RecipeEditor, ExportSheet | App |
+| `Recettes.svelte` | Liste triée (`rank`), filtres catégorie, recherche, sélection multiple (catégoriser/supprimer/exporter), import fichier/photo, import par lien, recherche internet | `thumb`, db, `CATEGORIES`, `categoryOf`, `deleteRecipe`, `rank`, `saveRecipe`, `setCategory`, `tokens`, web-sources, recipe-import, `readPhoto` (dynamique), RecipeSheet, RecipeEditor, ExportSheet, SourcesSheet | App |
 | `RecipeSheet.svelte` | Fiche recette : portions, état de chaque ingrédient, choix du produit, « ajouter manquants », « je cuisine » (+ annuler), note, vidéo | recipes (`checkRecipe`, `cook`, `undoCook`, `addMissingToShopping`, `matchKind`, `rateRecipe`, `formatIngredient`, `yieldLabel`), `embedUrl`, `getVideo` | Recettes |
 | `RecipeEditor.svelte` | Création/modification recette (photo, lien image, vidéo, catégorie, ingrédients/étapes une par ligne) | recipes (`saveRecipe`, `deleteRecipe`, `parseIngredient`, `formatIngredient`, `CATEGORIES`, `categoryOf`, `withCategory`), media | Recettes |
+| `SourcesSheet.svelte` | Réglages des sources internet : adresse du Worker + test, TheMealDB / YouTube / Edamam, sites (activer, ajouter, retirer) | web-sources | Recettes |
 | `ExportSheet.svelte` | Choix du format d'export | `FORMATS`, `exportBlob`, `saveFile` | Recettes |
 | `ScanSheet.svelte` | Scan code-barres (caméra ou photo), photo d'emballage (OCR), saisie manuelle, puis ajout au stock ou aux courses | barcode, ocr, `AISLES`, `guessAisle`, `LOCATIONS`, `guessLocation`, `addItem`, `addStock` | Home, Stock, Courses |
 | `RestockSheet.svelte` | Après les courses : quantités achetées → stock | `planRestock`, `applyRestock`, `formatQty`, `clearChecked` | Courses |
@@ -277,6 +295,7 @@ Convention des fiches (« sheets ») : props `onclose` (et parfois `ondone`), af
 | `recipes.test.ts` | recipes.ts (correspondance, cook, rank…) |
 | `import.test.ts` | recipe-import.ts |
 | `web-recipes.test.ts` | web-recipes.ts |
+| `web-sources.test.ts` | web-sources.ts, worker/worker.js |
 | `barcode.test.ts` | barcode.ts (`validCode`, `lookup`, rayons) |
 | `ocr.test.ts` | ocr.ts (`suggest`) |
 | `locations.test.ts` | locations.svelte.ts |

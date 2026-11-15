@@ -5,11 +5,12 @@
   import { thumb } from '../lib/media';
   import { db } from '../lib/db';
   import { addMissingToShopping, CATEGORIES, categoryOf, checkRecipe, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
-  import { fetchReliable, ideasFromStock, searchWeb, type WebHit } from '../lib/web-recipes';
+  import { ideasAll, importUrl, searchAll, sourceLabel, type WebResult } from '../lib/web-sources';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
   import RecipeEditor from './RecipeEditor.svelte';
   import ExportSheet from './ExportSheet.svelte';
+  import SourcesSheet from './SourcesSheet.svelte';
   import { IMPORT_ACCEPT, fileText, parseRecipeJson, parseRecipeText } from '../lib/recipe-import';
 
   const recipes = liveQuery(() => db.recipes.filter((r) => !r.deleted).toArray());
@@ -141,9 +142,27 @@
     }
   }
 
+  /** Recette d'une page internet : ouverte dans l'éditeur pour vérification avant enregistrement. */
+  let link = $state('');
+  async function importLink() {
+    importError = '';
+    importing = 'Lecture de la page…';
+    try {
+      const { id, createdAt, updatedAt, ...r } = await importUrl(link);
+      editing = draft(r);
+      adding = false;
+      link = '';
+    } catch (err) {
+      importError = err instanceof Error && err.message.length < 140 ? err.message : 'Page illisible.';
+    } finally {
+      importing = '';
+    }
+  }
+
   /* ---------- Internet ---------- */
-  /** Recettes internet dont la liste d'ingrédients est fiable (voir fetchReliable). */
-  let web = $state.raw<{ title: string; recipes: Recipe[] } | null>(null);
+  let sourcing = $state(false);
+  /** Recettes internet des sources activées (voir web-sources), avec les sources en échec. */
+  let web = $state.raw<({ title: string } & WebResult) | null>(null);
   const webChecks = $derived(
     (web?.recipes ?? []).map((r) => checkRecipe(r, $stock ?? [])).sort((a, b) => a.missing.length - b.missing.length || b.score - a.score)
   );
@@ -153,11 +172,11 @@
   let webError = $state('');
   let preview = $state.raw<Recipe | null>(null);
 
-  async function runWeb(title: string, search: () => Promise<WebHit[]>) {
+  async function runWeb(search: () => Promise<{ title: string } & WebResult>) {
     webBusy = true;
     webError = '';
     try {
-      web = { title, recipes: await fetchReliable(await search()) };
+      web = await search();
       shopped = {};
     } catch {
       webError = 'Recherche impossible : vérifie la connexion internet.';
@@ -165,9 +184,12 @@
       webBusy = false;
     }
   }
-  const searchOnline = () => runWeb(`« ${text.trim()} » sur internet`, () => searchWeb(text.trim()));
+  const searchOnline = () => runWeb(async () => ({ title: `« ${text.trim()} » sur internet`, ...(await searchAll(text.trim())) }));
   const ideas = () =>
-    runWeb('Idées avec ton stock', () => ideasFromStock(($stock ?? []).map((s) => s.name)));
+    runWeb(async () => {
+      const { picked, ...found } = await ideasAll(($stock ?? []).map((s) => s.name));
+      return { title: `Idées avec ton stock${picked.length ? ` (dont ${picked.join(', ')})` : ''}`, ...found };
+    });
   $effect(() => {
     void text;
     web = null;
@@ -306,20 +328,23 @@
   {:else}
     <button class="btn ghost" onclick={ideas} disabled={webBusy || !($stock ?? []).length}>🌐 Idées sur internet avec mon stock</button>
   {/if}
+  <button class="link" onclick={() => (sourcing = true)}>⚙️ Sources internet</button>
   {#if webBusy}<p class="hint">Recherche…</p>{/if}
   {#if webError}<p class="err">{webError}</p>{/if}
   {#if web}
     <h2>{web.title} <span>{webChecks.length}</span></h2>
+    {#each web.errors as e}<p class="err">{e}</p>{/each}
     {#if !webChecks.length}
-      <p class="hint">Rien trouvé avec une liste d'ingrédients fiable. Les recettes internet sont en anglais : essaie un ingrédient (« poulet ») ou un plat (« curry »).</p>
+      <p class="hint">Rien trouvé avec une liste d'ingrédients fiable. Essaie un ingrédient (« poulet ») ou un plat (« curry »), ou active d'autres sources (⚙️).</p>
     {/if}
     <ul class="cards">
       {#each webChecks as c (c.recipe.id)}
         <li>
           <button class="card" onclick={() => openWeb(c.recipe)}>
-            {#if c.recipe.image}<img src="{c.recipe.image}/preview" alt="" loading="lazy" />{:else}<span class="emoji">🌐</span>{/if}
+            {#if c.recipe.image}<img src={c.recipe.id.startsWith('web-') ? `${c.recipe.image}/preview` : c.recipe.image} alt="" loading="lazy" />{:else}<span class="emoji">{c.recipe.emoji ?? '🌐'}</span>{/if}
             <span class="body">
               <span class="name">{c.recipe.name}</span>
+              <span class="meta">{sourceLabel(c.recipe)}{#if c.recipe.time}{' · '}⏱ {duration(c.recipe.time)}{/if}</span>
               {#if c.feasible}
                 <span class="status ok">✅ Faisable</span>
               {:else}
@@ -365,6 +390,10 @@
       📸 Photo d'une recette <small>livre, fiche, magazine</small>
       <input type="file" accept="image/*" onchange={importPhoto} hidden />
     </label>
+    <form class="linkrow" onsubmit={(e) => (e.preventDefault(), importLink())}>
+      <input bind:value={link} placeholder="🔗 Lien d'une recette (CuisineAZ, Elle à Table…)" inputmode="url" autocapitalize="off" autocomplete="off" aria-label="Lien d'une recette" />
+      <button class="btn" disabled={!link.trim() || !!importing}>Importer</button>
+    </form>
     {#if importing}<p class="hint">{importing}</p>{/if}
     {#if importError}<p class="err">{importError}</p>{/if}
     <p class="hint">Une recette par fichier. La fiche est remplie automatiquement, tu la vérifies avant d'enregistrer.</p>
@@ -380,6 +409,10 @@
     {/each}
     <button class="link" onclick={() => categorizePicked()}>Retirer la catégorie</button>
   </div>
+{/if}
+
+{#if sourcing}
+  <SourcesSheet onclose={() => (sourcing = false)} />
 {/if}
 
 {#if exporting}
@@ -478,6 +511,11 @@
   .web h2 span { font-weight: 400; }
   .web .btn:disabled { opacity: 0.5; }
   .web .shop { margin-top: 4px; width: 100%; font-size: 13px; }
+  .web > .link { align-self: center; padding: 4px 8px; color: var(--muted); font-size: 14px; }
+  .linkrow { display: flex; gap: 8px; }
+  .linkrow input { flex: 1; min-width: 0; }
+  .linkrow .btn { flex: none; }
+  .linkrow .btn:disabled { opacity: 0.5; }
   .card img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; }
   .hint { margin: 0; color: var(--muted); font-size: 14px; }
   .err { margin: 0; color: var(--danger); font-size: 14px; }

@@ -95,4 +95,25 @@ describe('TheMealDB', () => {
     const list = await fetchReliable(['1', '2', '3', '4', '5'].map((id) => ({ id, name: id })));
     expect(list.map((r) => r.id)).toEqual(['web-1']);
   });
+
+  it('idées depuis le stock : noms exacts de TheMealDB, tout le stock pris en compte', async () => {
+    const data: Record<string, { idMeal: string; strMeal: string }[]> = {
+      carrots: [{ idMeal: '1', strMeal: 'A' }],
+      potatoes: [{ idMeal: '1', strMeal: 'A' }, { idMeal: '2', strMeal: 'B' }],
+      'small potatoes': [{ idMeal: '3', strMeal: 'C' }],
+      rice: [{ idMeal: '2', strMeal: 'B' }, { idMeal: '1', strMeal: 'A' }]
+    };
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = new URL(url);
+      const i = u.searchParams.get('i')!.replace(/_/g, ' ');
+      if (u.pathname.endsWith('list.php'))
+        return { ok: true, json: async () => ({ meals: ['Small Potatoes', 'Carrots', 'Potatoes', 'Rice', 'Salt', 'Wasabi'].map((strIngredient) => ({ strIngredient })) }) };
+      asked.push(i);
+      return { ok: true, json: async () => ({ meals: data[i] ?? null }) };
+    }));
+    const hits = await ideasFromStock(['sel', 'carottes', 'truc', 'pommes de terre', 'riz basmati', 'carottes']);
+    expect(asked).toEqual(['carrots', 'potatoes', 'rice', 'small potatoes']);
+    expect(hits.map((h) => h.name)).toEqual(['A', 'B', 'C']);
+  });
 });
