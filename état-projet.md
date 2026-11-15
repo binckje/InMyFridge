@@ -84,6 +84,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 - **Fiche recette** : nombre de personnes — ou de pièces si la recette a une unité (« 20 cookies », champ « Unité » dans l'éditeur) — ajustable (quantités recalculées), note sur 5 étoiles, « 🛒 Ajouter les manquants aux courses », **« 👩‍🍳 J'ai cuisiné ça »** (retire les quantités du stock, descend d'un niveau les produits suivis par niveau ; annulable).
 - **Créer / modifier / supprimer** une recette : ingrédients un par ligne (« 200 g farine », « 2 c. à soupe d'huile », « sel »), étapes une par ligne, emoji, temps, étiquettes.
 - **Internet (TheMealDB, gratuit, sans compte)** : « Chercher « x » sur internet » (nom de plat ou ingrédient traduit fr → en) et « Idées sur internet avec mon stock ». Aperçu comparé au stock, puis « Enregistrer dans mes recettes ». Ingrédients et mesures traduits (cup, tbsp, lb, oz) ; **étapes en anglais** (pas d'API de recettes françaises gratuite accessible depuis le navigateur).
+- **Autres sources internet (via Worker Cloudflare, `worker/`)** : sites de recettes (CuisineAZ, Elle à Table, sites ajoutés — données schema.org), YouTube (description listant les ingrédients), Edamam. Recherche unifiée sur les sources cochées dans « ⚙️ Sources internet » ; « ＋ › lien d'une recette » importe une page dans l'éditeur. Clés API dans le Worker. **Non testé sur les vrais sites / API** (réseau de développement bloqué).
 
 ## 5 ter bis. Import / export de recettes (implémenté)
 
@@ -191,6 +192,9 @@ Alternatives écartées : Flutter (iOS impose un compte Apple pour l'installatio
 | `src/lib/recipes.ts` | Lecture des ingrédients, comparaison au stock, cuisiner, recettes de base |
 | `src/lib/recipes-seed.ts` | Les 31 recettes de base |
 | `src/lib/web-recipes.ts` | TheMealDB + traduction des ingrédients |
+| `src/lib/web-sources.ts` | Sources internet (sites, YouTube, Edamam), réglages, recherche unifiée |
+| `src/views/SourcesSheet.svelte` | Réglages des sources internet |
+| `worker/worker.js` | Worker Cloudflare (relais sites + clés API), notice `worker/README.md` |
 | `src/lib/barcode.ts` | Caméra (BarcodeDetector / ZXing), Open Food Facts, mémoire produits |
 | `src/lib/ocr.ts` | Tesseract.js, suggestions de nom et contenance |
 | `src/lib/backup.ts` | Sauvegarde / restauration JSON |
@@ -267,3 +271,4 @@ Note : en local via le Wi-Fi (`http://192.168…`), la caméra est bloquée par 
 | 2026-10-17 | Scan : repli Open Products Facts + Open Beauty Facts pour les produits ménagers / hygiène. |
 | 2026-10-17 | Perte de données après effacement de l'historique : indicateur « non sauvegardé » sur ☁️ + alerte à la fermeture + copies automatiques locales (10). |
 | 2026-10-17 | Recettes : précisions ignorées, alternatives « / » et « ou », suggestions 💡 de produits proches (non comptés sauf « Utiliser »). Sucre : familles blanc / roux / glace. |
+| 2026-11-15 | Recettes internet : noms exacts TheMealDB ; sources supplémentaires via Worker Cloudflare (sites schema.org, YouTube, Edamam), import par lien, réglages « Sources internet ». |

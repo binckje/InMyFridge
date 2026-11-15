@@ -107,6 +107,18 @@ export const toFrench = (en: string) => lookup(en) ?? en.trim().toLowerCase();
 /** Ingrédient anglais dont la traduction est connue (comparaison au stock possible). */
 export const isKnown = (en: string) => lookup(en) !== undefined;
 
+/**
+ * Aliment décrit librement en anglais (« boneless skinless chicken breasts ») :
+ * traduction du nom entier, sinon de sa fin (le nom vient en dernier en anglais).
+ */
+export function frenchFood(en: string): string | undefined {
+  const words = en.toLowerCase().replace(/[^a-zà-ÿ\s-]/g, ' ').trim().split(/\s+/);
+  for (let i = 0; i < words.length; i++) {
+    const hit = lookup(words.slice(i).join(' '));
+    if (hit) return hit;
+  }
+}
+
 /** Ingrédient français → anglais, pour chercher par ingrédient. */
 export function toEnglish(fr: string): string | undefined {
   const t = tokens(fr);
