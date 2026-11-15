@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/lib/db';
 import { guessAisle } from '../src/lib/aisles';
-import { addStock, adjust, formatQty, parseStock, saveGroup, updateStock } from '../src/lib/stock';
+import { addStock, checkAdd, similarInStock, adjust, formatQty, parseStock, saveGroup, updateStock } from '../src/lib/stock';
 import { addItem, dismissItem, groupTotal, isEmptyUntracked, isLow, isOut, syncLowStock } from '../src/lib/shopping';
 import { syncWith, type Snapshot, type SyncProvider } from '../src/lib/sync';
 
@@ -269,5 +269,50 @@ describe('produit épuisé', () => {
     expect(isOut({ ...base, qty: 50, unit: 'g' })).toBe(false);
     expect(isOut({ ...base, level: 'plus beaucoup' })).toBe(false);
     expect(isOut({ ...base, level: 'moyen', count: 0 })).toBe(true);
+  });
+});
+
+describe('ajout : groupes et produits similaires', () => {
+  it('détecte un produit similaire par mot commun, sans accents ni pluriel', async () => {
+    await addStock('lait demi-écrémé 1 l');
+    await addStock('tomates cerises 6');
+    const stock = await db.stock.toArray();
+    expect(similarInStock('Lait', stock).map((s) => s.name)).toEqual(['lait demi-écrémé']);
+    expect(similarInStock('tomate', stock).map((s) => s.name)).toEqual(['tomates cerises']);
+    expect(similarInStock('riz', stock)).toEqual([]);
+  });
+
+  it('checkAdd : produit identique au même endroit = cumul direct, sinon similaires et groupes', async () => {
+    const lait = (await addStock('lait 1 l'))!;
+    await saveGroup('Fromages', { mode: 'count', threshold: 1 });
+    expect((await checkAdd('lait 2 l', lait.locationId))!.exact).toBe(true);
+    const c = (await checkAdd('lait entier 2 l', lait.locationId))!;
+    expect(c.exact).toBe(false);
+    expect(c.similar.map((s) => s.name)).toEqual(['lait']);
+    expect(c.groups.map((g) => g.name)).toEqual(['Fromages']);
+  });
+
+  it('range le nouveau produit dans le groupe choisi', async () => {
+    const groupId = await saveGroup('Fromages', { mode: 'count', threshold: 1 });
+    const comte = (await addStock('comté', undefined, undefined, undefined, { groupId }))!;
+    expect((await db.stock.get(comte.id))!.groupId).toBe(groupId);
+    expect((await addStock('brie'))!.groupId).toBeUndefined();
+  });
+
+  it('verse la quantité dans le produit similaire choisi, avec conversion', async () => {
+    const lait = (await addStock('lait 1 l'))!;
+    const r = (await addStock('lait entier 50 cl', undefined, undefined, undefined, { mergeInto: lait.id }))!;
+    expect(r.id).toBe(lait.id);
+    expect((await db.stock.get(lait.id))!.qty).toBe(1.5);
+    expect(await db.stock.count()).toBe(1);
+
+    const beurre = (await addStock('beurre'))!;
+    await updateStock(beurre.id, { level: 'plus beaucoup' });
+    await addStock('beurre doux 250 g', undefined, undefined, undefined, { mergeInto: beurre.id });
+    expect((await db.stock.get(beurre.id))!.level).toBe('suffisamment');
+
+    const oeufs = (await addStock('oeufs 6'))!;
+    await addStock('oeufs bio 500 g', undefined, undefined, undefined, { mergeInto: oeufs.id });
+    expect((await db.stock.get(oeufs.id))!.qty).toBe(7);
   });
 });

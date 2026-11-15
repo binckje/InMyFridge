@@ -7,9 +7,10 @@
   import type { Location } from '../lib/types';
   import { isEmptyUntracked, isGroupLow, isLow, isOut } from '../lib/shopping';
   import {
-    UNITS, addStock, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
+    UNITS, detectKind, type QtyKind, adjust, deleteStock, formatPacks, formatQty, parseStock, saveGroup, splitPacks, updateStock, withQty
   } from '../lib/stock';
   import { LEVELS, type Category, type Level, type StockItem, type Unit } from '../lib/types';
+  import AddStockSheet from './AddStockSheet.svelte';
   import ScanSheet from './ScanSheet.svelte';
   import LocationsSheet from './LocationsSheet.svelte';
 
@@ -98,14 +99,23 @@
 
   /* ---------- Ajout rapide ---------- */
   const target = $derived(LOCATIONS.find((l) => l.id === filter));
+  /** Ajout au stock en attente de réponse (groupe, produit similaire) dans AddStockSheet. */
+  type Pending = { input: string; locationId?: string; kind?: QtyKind; aisle?: string; resolve: (s?: StockItem) => void };
+  let pending = $state<Pending | null>(null);
+  const askAdd = (input: string, locationId?: string, kind?: QtyKind, aisle?: string) =>
+    new Promise<StockItem | undefined>((resolve) => (pending = { input, locationId, kind, aisle, resolve }));
   async function submit(e: SubmitEvent) {
     e.preventDefault();
     const input = text;
     const k = qtyKind;
     text = '';
     kind = null;
-    const added = await addStock(input, target?.id, k);
-    if (!added) return;
+    const added = await askAdd(input, target?.id, k);
+    if (!added) {
+      // annulé : la saisie revient
+      if (!text) [text, kind] = [input, k];
+      return;
+    }
     buzz();
     flash = added.id;
     setTimeout(() => (flash = null), 1200);
@@ -611,6 +621,18 @@
       <button type="submit" class="btn">Enregistrer</button>
     </div>
   </form>
+{/if}
+
+{#if pending}
+  {#key pending}
+    <AddStockSheet
+      input={pending.input}
+      locationId={pending.locationId}
+      kind={pending.kind}
+      aisle={pending.aisle}
+      onclose={(s) => { pending?.resolve(s); pending = null; }}
+    />
+  {/key}
 {/if}
 
 <style>

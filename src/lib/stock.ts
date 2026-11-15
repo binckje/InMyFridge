@@ -44,26 +44,96 @@ export function parseStock(input: string): { name: string; qty?: number; unit?: 
   return { name: input };
 }
 
+/** Mots ignorés pour comparer deux noms de produit. */
+const STOP = new Set(['les', 'des', 'aux', 'avec', 'sans', 'pour', 'the', 'bio']);
+
+/** Mots significatifs d'un nom : sans accents, sans pluriel, sans petits mots. */
+const wordsOf = (name: string) =>
+  keyOf(name)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !STOP.has(w))
+    .map((w) => w.replace(/[sx]$/, ''));
+
+/** Produits en stock dont le nom partage un mot avec `name` (« lait » ≈ « lait demi-écrémé »). */
+export function similarInStock(name: string, stock: StockItem[]): StockItem[] {
+  const words = new Set(wordsOf(name));
+  return stock
+    .filter((s) => !s.deleted && wordsOf(s.name).some((w) => words.has(w)))
+    .sort((x, y) => x.name.localeCompare(y.name, 'fr'));
+}
+
+/** Choix faits dans la feuille d'ajout : groupe du nouveau produit, ou produit existant à compléter. */
+export interface AddOptions {
+  groupId?: string;
+  /** Id du produit en stock qui reçoit la quantité (au lieu de créer un produit). */
+  mergeInto?: string;
+}
+
+/** Lecture de la saisie : nom, quantité, rayon, emplacement et produit identique déjà en stock. */
+async function resolveAdd(input: string, locationId: string | undefined, kind: QtyKind, aisle?: string) {
+  const parsed = parseStock(input.trim());
+  const unit = kind === 'level' ? undefined : kind;
+  const qty = unit ? (parsed.qty ?? 1) : undefined;
+  // lots seulement si l'unité choisie est celle tapée (« 2x250g »)
+  const packs = unit && unit === parsed.unit ? parsed.packs : undefined;
+  const clean = parsed.name.trim();
+  if (!clean) return;
+  const aisleId = aisle ?? (await aisleFor(clean));
+  const loc = locationId ?? guessLocation(aisleId);
+  const stock = (await db.stock.toArray()).filter((s) => !s.deleted);
+  const existing = stock.find((s) => s.locationId === loc && keyOf(s.name) === keyOf(clean));
+  return { clean, unit, qty, packs, aisleId, loc, stock, existing };
+}
+
+/**
+ * Avant un ajout : faut-il interroger l'utilisateur ? `exact` = le produit existe déjà au même endroit
+ * (cumul direct). Sinon : groupes proposés et produits similaires en stock.
+ */
+export async function checkAdd(input: string, locationId?: string, kind: QtyKind = detectKind(input), aisle?: string) {
+  const r = await resolveAdd(input, locationId, kind, aisle);
+  if (!r) return;
+  const groups = (await db.groups.toArray())
+    .filter((g) => !g.deleted)
+    .sort((x, y) => x.name.localeCompare(y.name, 'fr'));
+  return { name: r.clean, exact: !!r.existing, groups, similar: r.existing ? [] : similarInStock(r.clean, r.stock) };
+}
+
+/**
+ * Quantité d'un produit A versée dans un produit similaire B, sans changer la façon dont B est suivi :
+ * niveau → « suffisamment » ; unité compatible → convertie puis ajoutée ; sinon un lot / une pièce de plus.
+ */
+function mergeChanges(b: StockItem, qty?: number, unit?: Unit, packs?: number[]): Partial<StockItem> {
+  if (b.level) return { level: 'suffisamment' };
+  const bu = b.unit ?? 'pièce';
+  const q = qty != null && unit ? convert(qty, unit, bu) : undefined;
+  if (q == null) {
+    if (b.packs && b.packSize) return addPacks(b, 1, b.packSize);
+    return bu === 'pièce' ? { qty: r3((b.qty ?? 0) + 1) } : {};
+  }
+  if (bu !== 'pièce' && (b.packs || packs)) {
+    const added = packs?.map((p) => convert(p, unit!, bu)!) ?? [q];
+    return withPacksAdded(b, added);
+  }
+  return { qty: r3((b.qty ?? 0) + q) };
+}
+
 /** Ajout rapide. Si le produit existe déjà au même endroit : on additionne (ou on remplace). */
 export async function addStock(
   input: string,
   locationId?: string,
   kind: QtyKind = detectKind(input),
-  aisle?: string
+  aisle?: string,
+  options: AddOptions = {}
 ): Promise<StockItem | undefined> {
-  const parsed = parseStock(input.trim());
-  const name = parsed.name;
-  const unit = kind === 'level' ? undefined : kind;
-  const qty = unit ? (parsed.qty ?? 1) : undefined;
-  // lots seulement si l'unité choisie est celle tapée (« 2x250g »)
-  const packs = unit && unit === parsed.unit ? parsed.packs : undefined;
-  const clean = name.trim();
-  if (!clean) return;
-  const aisleId = aisle ?? (await aisleFor(clean));
-  const loc = locationId ?? guessLocation(aisleId);
-  const existing = (await db.stock.toArray()).find(
-    (s) => !s.deleted && s.locationId === loc && keyOf(s.name) === keyOf(clean)
-  );
+  const r = await resolveAdd(input, locationId, kind, aisle);
+  if (!r) return;
+  const { clean, unit, qty, packs, aisleId, loc, existing } = r;
+  const target = options.mergeInto ? r.stock.find((s) => s.id === options.mergeInto) : undefined;
+  if (target) {
+    const changes = mergeChanges(target, qty, unit, packs);
+    await updateStock(target.id, changes);
+    return { ...target, ...changes };
+  }
   if (existing) {
     const sameUnit = existing.unit === unit && existing.qty != null && unit !== 'pièce';
     const changes: Partial<StockItem> =
@@ -86,7 +156,8 @@ export async function addStock(
     aisleId,
     updatedAt: Date.now(),
     ...(qty == null ? { level: 'suffisamment', thresholdLevel: 'plus beaucoup' } : { qty, unit }),
-    ...(packs && { packs, packSize: packs[0] })
+    ...(packs && { packs, packSize: packs[0] }),
+    ...(options.groupId && { groupId: options.groupId })
   };
   await db.stock.add(item);
   await syncLowStock();
