@@ -26,9 +26,9 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 | 4 | Épicerie sèche sucrée | Épices · Autre |
 | 5 | Épices / aromates | Épices · Autre |
 | 6 | Autres | Épices · Autre |
-| 7 | Produits ménagers | Épices · Autre |
+| 7 | Produits ménagers | — |
 
-Sous-catégories épices, **communes à tous les emplacements** (mêmes identifiants, un seul filtre) : Sel / poivre · Épices · Herbes séchées · Aromates · Sucré / pâtisserie · Mélanges / bouillons. Pas de variante frais / surgelé : l'état se déduit de l'emplacement. Les utilisateurs existants les reçoivent par une migration unique (par appareil).
+Sous-catégories épices, **communes à tous les emplacements sauf Produits ménagers** (mêmes identifiants, un seul filtre) : Sel / poivre · Épices · Herbes séchées · Aromates · Sucré / pâtisserie · Mélanges / bouillons. Pas de variante frais / surgelé : l'état se déduit de l'emplacement. Les utilisateurs existants les reçoivent par une migration unique (par appareil).
 
 ## 2. Quantités
 

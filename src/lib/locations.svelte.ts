@@ -38,7 +38,7 @@ export const DEFAULT_LOCATIONS: Location[] = [
   { id: 'epicerie-sucree', label: 'Épicerie sucrée', emoji: '🍫', categories: SPICES_ONLY },
   { id: 'epices', label: 'Épices / aromates', emoji: '🌿', categories: SPICES_ONLY },
   { id: 'autres', label: 'Autres', emoji: '📦', categories: SPICES_ONLY },
-  { id: 'menager', label: 'Produits ménagers', emoji: '🧽', categories: SPICES_ONLY }
+  { id: 'menager', label: 'Produits ménagers', emoji: '🧽' }
 ];
 
 /**
@@ -69,7 +69,11 @@ export async function seedLocations() {
   const todo = DEFAULT_LOCATIONS.filter((l) => ADDED_LATER.includes(l.id) && !existing.has(l.id));
   if (todo.length) await db.locations.bulkAdd(todo.map((l) => ({ ...l, order: ++order, updatedAt: 0 })));
   await addSpiceCategories(all);
+  await removeSpicesFromHousehold();
 }
+
+/** Emplacements sans sous-catégories épices. */
+const NO_SPICES = ['menager'];
 
 /**
  * Migration (une fois par appareil) : ajoute les sous-catégories épices à tous les
@@ -80,7 +84,7 @@ async function addSpiceCategories(all: StoredLocation[]) {
   try { if (localStorage.getItem(KEY)) return; } catch { /* stockage indisponible */ }
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const now = Date.now();
-  const changed = all.filter((l) => !l.deleted).flatMap((l) => {
+  const changed = all.filter((l) => !l.deleted && !NO_SPICES.includes(l.id)).flatMap((l) => {
     const cats = [...(l.categories ?? [])];
     const has = (c: Category) => cats.some((x) => x.id === c.id || norm(x.label) === norm(c.label));
     const missing = SPICES.filter((c) => !has(c));
@@ -91,6 +95,25 @@ async function addSpiceCategories(all: StoredLocation[]) {
     return [{ ...l, categories: cats, updatedAt: now }];
   });
   if (changed.length) await db.locations.bulkPut(changed);
+  try { localStorage.setItem(KEY, '1'); } catch { /* stockage indisponible */ }
+}
+
+/**
+ * Migration (une fois par appareil) : retire des produits ménagers les sous-catégories
+ * épices ajoutées par addSpiceCategories (et « Autre » s'il ne reste qu'elle).
+ */
+async function removeSpicesFromHousehold() {
+  const KEY = 'imf.migr.householdNoSpices';
+  try { if (localStorage.getItem(KEY)) return; } catch { /* stockage indisponible */ }
+  for (const id of NO_SPICES) {
+    const l = await db.locations.get(id);
+    if (!l?.categories) continue;
+    const ids = new Set(SPICES.map((c) => c.id));
+    const cats = l.categories.filter((c) => !ids.has(c.id));
+    if (cats.length === l.categories.length) continue;
+    const keep = cats.length === 1 && cats[0].id === OTHER.id ? undefined : cats;
+    await db.locations.update(id, { categories: keep, updatedAt: Date.now() });
+  }
   try { localStorage.setItem(KEY, '1'); } catch { /* stockage indisponible */ }
 }
 
