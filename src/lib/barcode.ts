@@ -150,6 +150,7 @@ export function aisleFromCategories(tags: string[], name: string, fallback?: str
     [/meats|fishes|seafood|poultry|hams|sausages/, 'viandes-poissons'],
     [/fruits|vegetables/, 'fruits-legumes'],
     [/beverages|waters|juices|sodas|wines|beers/, 'liquides'],
+    [/spices|herbs|seasonings|salts|peppers/, 'epices'],
     [/chocolates|biscuits|confectioneries|sweet|breakfast-cereals|jams|honeys|sugars|coffees|teas/, 'epicerie-sucree'],
     [/pastas|rices|canned|sauces|oils|condiments|flours|legumes|snacks|salty|breads|soups/, 'epicerie-salee'],
     [/household|cleaning|detergents|hygiene|laundry|dishwashing|toilet|paper|cosmetics|shampoos|soaps|toothpastes/, 'menager']
