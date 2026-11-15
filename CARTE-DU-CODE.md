@@ -232,8 +232,9 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 ### `web-recipes.ts` — recettes internet (TheMealDB, en anglais)
 - `toFrench`, `toEnglish`, `measure` — traduction ingrédients/mesures.
 - `searchWeb(query)`, `ideasFromStock(names)` → `WebHit[]`, `fetchWebRecipe(id)` → `Recipe` (id `web-<id>`). Recettes.
+- `loadCatalog()` / `englishNames(fr, cat)` (internes) — le filtre TheMealDB exige le nom exact (« carrots », pas « carrot ») : les noms viennent de leur liste `list.php?i=list`, comparée au stock via `matches`. `ideasFromStock` couvre tout le stock (24 requêtes max).
 - `EN_FR` : dictionnaire anglais → français ; recherche tolérante aux pluriels anglais (`lookup`).
-- `isKnown(en)`, `isReliable(meal)` (≥ 3 ingrédients, tous traduits), `fetchReliable(hits, 15)` → `Recipe[]` fiables seulement. Recettes : affiche les manquants + bouton 🛒 ; recette acceptée enregistrée avec lien + ingrédients, sans les étapes.
+- `isKnown(en)`, `isReliable(meal)` (≥ 3 ingrédients, tous traduits), `fetchReliable(hits, 40)` → `Recipe[]` fiables seulement. Recettes : affiche les manquants + bouton 🛒 ; recette acceptée enregistrée avec lien + ingrédients, sans les étapes.
 
 ---
 

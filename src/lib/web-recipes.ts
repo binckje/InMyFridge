@@ -1,4 +1,4 @@
-import { parseIngredient, tokens } from './recipes';
+import { isBasic, matches, parseIngredient, tokens } from './recipes';
 import type { Recipe, RecipeIngredient } from './types';
 
 /**
@@ -69,7 +69,22 @@ const EN_FR: Record<string, string> = {
   'beef fillet': 'boeuf', 'stewing beef': 'boeuf', 'beef mince': 'boeuf haché', steak: 'boeuf', 'sirloin steak': 'boeuf', 'streaky bacon': 'lardons', pancetta: 'lardons', prosciutto: 'jambon cru',
   'smoked salmon': 'saumon fumé', 'king prawn': 'crevettes', 'tiger prawn': 'crevettes', mussel: 'moules', squid: 'calamars', haddock: 'églefin', mackerel: 'maquereau', sardine: 'sardines', anchovy: 'anchois',
   tofu: 'tofu', 'dry white wine': 'vin blanc', beer: 'bière', brandy: 'cognac', rum: 'rhum', 'ice cream': 'glace',
-  'free-range egg': 'oeufs', 'egg yolk': 'oeufs', 'cold water': 'eau', 'boiling water': 'eau', 'warm water': 'eau', 'salted butter': 'beurre', 'semi-skimmed milk': 'lait', 'whole milk': 'lait'
+  'free-range egg': 'oeufs', 'egg yolk': 'oeufs', 'cold water': 'eau', 'boiling water': 'eau', 'warm water': 'eau', 'salted butter': 'beurre', 'semi-skimmed milk': 'lait', 'whole milk': 'lait',
+  // Variantes d'écriture de TheMealDB
+  'turmeric powder': 'curcuma', sake: 'saké', 'dark soy sauce': 'sauce soja', 'light soy sauce': 'sauce soja', 'white vinegar': 'vinaigre',
+  'peanut oil': 'huile', 'rapeseed oil': 'huile', 'extra virgin olive oil': 'huile', 'sesame seed oil': 'huile de sésame', 'mustard powder': 'moutarde',
+  'sun-dried tomato': 'tomates séchées', 'tinned tomato': 'tomates concassées', 'canned tomato': 'tomates concassées', 'diced tomato': 'tomates concassées',
+  'baby plum tomato': 'tomates cerises', 'grape tomato': 'tomates cerises', 'vine tomato': 'tomates', 'tomato sauce': 'sauce tomate',
+  'ginger paste': 'gingembre', 'ground ginger': 'gingembre', 'minced garlic': 'ail', 'chopped onion': 'oignon', 'chopped parsley': 'persil', 'freshly chopped parsley': 'persil',
+  fenugreek: 'fenugrec', saffron: 'safran', marjoram: 'marjolaine', 'chili powder': 'piment', 'red chilli powder': 'piment', 'red chilli flake': 'piment',
+  'basil leaves': 'basilic', 'fresh basil': 'basilic', cilantro: 'coriandre', 'coriander leaves': 'coriandre', 'cinnamon stick': 'cannelle', 'ground allspice': 'quatre-épices',
+  'thai fish sauce': 'sauce poisson', hotsauce: 'sauce piquante', 'kosher salt': 'sel', 'potato starch': 'fécule de maïs',
+  'ground pork': 'porc haché', 'lean minced beef': 'boeuf haché', 'raw king prawn': 'crevettes', 'white fish fillet': 'poisson',
+  'full fat yogurt': 'yaourt', 'chilled butter': 'beurre', 'parmigiano-reggiano': 'parmesan', 'feta cheese': 'feta', 'mozzarella ball': 'mozzarella',
+  'dark brown sugar': 'cassonade', 'demerara sugar': 'cassonade', 'white flour': 'farine', 'flaked almond': 'amandes',
+  'chestnut mushroom': 'champignons', 'small potato': 'pommes de terre', 'floury potato': 'pommes de terre', 'charlotte potato': 'pommes de terre', 'egg plant': 'aubergine',
+  'pitted black olive': 'olives', 'brown rice': 'riz', 'bowtie pasta': 'pâtes', farfalle: 'pâtes', rigatoni: 'pâtes', macaroni: 'pâtes', tagliatelle: 'pâtes',
+  fettuccine: 'pâtes', 'linguine pasta': 'pâtes'
 };
 
 /** Français → anglais : premier terme anglais simple rencontré (« pâtes » → pasta). */
@@ -171,24 +186,70 @@ async function get(path: string): Promise<Meal[]> {
 
 const hit = (m: Meal): WebHit => ({ id: m.idMeal, name: m.strMeal, image: m.strMealThumb });
 
-/** Cherche par nom de plat, ou par ingrédient (« poulet » → chicken). */
-export async function searchWeb(query: string): Promise<WebHit[]> {
-  const en = toEnglish(query);
-  const [byName, byIngredient] = await Promise.all([
-    get(`search.php?s=${encodeURIComponent(query)}`).catch(() => []),
-    en ? get(`filter.php?i=${encodeURIComponent(en.replace(/ /g, '_'))}`).catch(() => []) : []
-  ]);
-  const seen = new Set<string>();
-  return [...byName, ...byIngredient].filter((m) => !seen.has(m.idMeal) && seen.add(m.idMeal)).map(hit);
+const byIngredient = (en: string) => get(`filter.php?i=${encodeURIComponent(en.replace(/ /g, '_'))}`).catch(() => []);
+
+/**
+ * Ingrédients connus de TheMealDB, regroupés par traduction française.
+ * Le filtre par ingrédient exige le nom exact (« carrots » : 79 recettes,
+ * « carrot » : 1, « potato » : aucune) : on part donc de leur propre liste.
+ */
+let catalog: Map<string, string[]> | undefined;
+async function loadCatalog(): Promise<Map<string, string[]>> {
+  if (catalog) return catalog;
+  const map = new Map<string, string[]>();
+  for (const m of await get('list.php?i=list').catch(() => [])) {
+    const en = m.strIngredient?.trim().toLowerCase();
+    const fr = en && lookup(en);
+    if (fr) map.set(fr, [...(map.get(fr) ?? []), en]);
+  }
+  // Noms les plus courts d'abord : les plus génériques (« chicken » avant « chicken thighs »)
+  for (const l of map.values()) l.sort((a, b) => a.length - b.length);
+  if (map.size) catalog = map;
+  return map;
 }
 
-/** Idées à partir du stock : recettes contenant le plus d'ingrédients disponibles. */
-export async function ideasFromStock(names: string[], limit = 4): Promise<WebHit[]> {
-  const en = [...new Set(names.map(toEnglish).filter((e): e is string => !!e))].slice(0, limit);
-  const lists = await Promise.all(en.map((i) => get(`filter.php?i=${encodeURIComponent(i.replace(/ /g, '_'))}`).catch(() => [])));
-  const score = new Map<string, { m: Meal; n: number }>();
-  for (const l of lists) for (const m of l) score.set(m.idMeal, { m, n: (score.get(m.idMeal)?.n ?? 0) + 1 });
-  return [...score.values()].sort((a, b) => b.n - a.n).slice(0, 30).map((s) => hit(s.m));
+/** Noms TheMealDB correspondant à un produit français (liste indisponible → traduction directe). */
+function englishNames(fr: string, cat: Map<string, string[]>): string[] {
+  const names = [...cat].filter(([k]) => matches(k, fr)).flatMap(([, en]) => en);
+  if (names.length) return names;
+  const en = toEnglish(fr);
+  return en ? [en, `${en}s`] : [];
+}
+
+/** Cherche par nom de plat, ou par ingrédient (« poulet » → chicken). */
+export async function searchWeb(query: string): Promise<WebHit[]> {
+  const en = englishNames(query, await loadCatalog()).slice(0, 4);
+  const lists = await Promise.all([get(`search.php?s=${encodeURIComponent(query)}`).catch(() => []), ...en.map(byIngredient)]);
+  const seen = new Set<string>();
+  return lists.flat().filter((m) => !seen.has(m.idMeal) && seen.add(m.idMeal)).map(hit);
+}
+
+/**
+ * Idées à partir du stock : recettes contenant le plus de produits disponibles.
+ * Tout le stock est pris en compte (un nom par produit d'abord, puis les variantes),
+ * dans la limite de `limit` requêtes.
+ */
+export async function ideasFromStock(names: string[], limit = 24): Promise<WebHit[]> {
+  const cat = await loadCatalog();
+  const products = [...new Set(names)].filter((n) => !isBasic(n)).map((n) => englishNames(n, cat));
+  // Requêtes : nom anglais → produits du stock concernés
+  const queries = new Map<string, Set<number>>();
+  for (let rank = 0; rank < 3; rank++)
+    products.forEach((en, p) => {
+      const q = en[rank];
+      if (!q || (!queries.has(q) && queries.size >= limit)) return;
+      queries.set(q, (queries.get(q) ?? new Set()).add(p));
+    });
+  const lists = await Promise.all([...queries.keys()].map(byIngredient));
+  const score = new Map<string, { m: Meal; found: Set<number> }>();
+  [...queries.values()].forEach((ps, i) => {
+    for (const m of lists[i]) {
+      const s = score.get(m.idMeal) ?? { m, found: new Set<number>() };
+      ps.forEach((p) => s.found.add(p));
+      score.set(m.idMeal, s);
+    }
+  });
+  return [...score.values()].sort((a, b) => b.found.size - a.found.size).slice(0, 40).map((s) => hit(s.m));
 }
 
 /** Noms anglais des ingrédients d'une recette TheMealDB. */
@@ -214,7 +275,7 @@ export async function fetchWebRecipe(id: string): Promise<Recipe | null> {
  * Détail des premiers résultats, en ne gardant que les recettes dont la liste
  * d'ingrédients est fiable (voir isReliable). Les échecs réseau sont ignorés.
  */
-export async function fetchReliable(hits: WebHit[], limit = 15): Promise<Recipe[]> {
+export async function fetchReliable(hits: WebHit[], limit = 40): Promise<Recipe[]> {
   const meals = await Promise.all(
     hits.slice(0, limit).map((h) => get(`lookup.php?i=${encodeURIComponent(h.id)}`).then(([m]) => m, () => undefined))
   );
