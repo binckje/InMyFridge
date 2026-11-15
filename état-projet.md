@@ -65,7 +65,7 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 ## 5 bis. Écran Stock (implémenté)
 
-- **Emplacements fixes (v1)** en puces défilantes : Tout · ⚠️ Bas · les 6 emplacements (compteur). Frigo et congélateur regroupés par sous-catégorie, « Tout » regroupé par emplacement.
+- **Emplacements fixes (v1)** en puces défilantes : Tout · ⚠️ Bas · les 7 emplacements (dont Épices / aromates) (compteur). Frigo et congélateur regroupés par sous-catégorie, « Tout » regroupé par emplacement.
 - **Champ unique chercher / ajouter** : filtre la liste en tapant ; ＋ ajoute dans l'emplacement affiché (deviné via le rayon si « Tout »). « lait 2 l », « riz 1 kg », « oeufs x6 ». Sans quantité → suivi par **niveau** (seuil par défaut « plus beaucoup »).
 - **Choix du type de quantité à l'ajout** : puces sous le champ (🔢 Nombre · 📊 Niveau · g · kg · ml · cl · l), présélectionnées d'après le texte tapé, modifiables. Sans nombre tapé : 1.
 - Produit déjà présent au même endroit : quantités additionnées (même unité), sinon remplacées.

@@ -19,6 +19,7 @@ export const DEFAULT_LOCATIONS: Location[] = [
   { id: 'congelateur', label: 'Congélateur', emoji: '❄️', categories: COLD },
   { id: 'epicerie-salee', label: 'Épicerie salée', emoji: '🥫' },
   { id: 'epicerie-sucree', label: 'Épicerie sucrée', emoji: '🍫' },
+  { id: 'epices', label: 'Épices / aromates', emoji: '🌿' },
   { id: 'autres', label: 'Autres', emoji: '📦' },
   { id: 'menager', label: 'Produits ménagers', emoji: '🧽' }
 ];
@@ -36,12 +37,20 @@ export function watchLocations() {
   });
 }
 
-/** Installe les emplacements par défaut au premier lancement. */
+/** Emplacements par défaut ajoutés après la v1 (installés aussi chez les utilisateurs existants). */
+const ADDED_LATER = ['epices'];
+
+/** Installe les emplacements par défaut au premier lancement, puis ceux ajoutés depuis. */
 export async function seedLocations() {
-  const existing = new Set((await db.locations.toCollection().primaryKeys()) as string[]);
-  const todo = DEFAULT_LOCATIONS.filter((l) => !existing.has(l.id));
-  if (existing.size || !todo.length) return;
-  await db.locations.bulkAdd(DEFAULT_LOCATIONS.map((l, order) => ({ ...l, order, updatedAt: 0 })));
+  const all = await db.locations.toArray();
+  const existing = new Set(all.map((l) => l.id));
+  if (!existing.size) {
+    await db.locations.bulkAdd(DEFAULT_LOCATIONS.map((l, order) => ({ ...l, order, updatedAt: 0 })));
+    return;
+  }
+  let order = Math.max(-1, ...all.map((l) => l.order));
+  const todo = DEFAULT_LOCATIONS.filter((l) => ADDED_LATER.includes(l.id) && !existing.has(l.id));
+  if (todo.length) await db.locations.bulkAdd(todo.map((l) => ({ ...l, order: ++order, updatedAt: 0 })));
 }
 
 export const locationById = (id: string): Location => LOCATIONS.find((l) => l.id === id) ?? LOCATIONS[0];
@@ -55,6 +64,7 @@ export function guessLocation(aisleId: string): string {
     surgeles: 'congelateur',
     'epicerie-salee': 'epicerie-salee',
     'epicerie-sucree': 'epicerie-sucree',
+    epices: 'epices',
     menager: 'menager',
     autre: 'autres'
   };

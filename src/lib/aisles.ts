@@ -10,8 +10,9 @@ export const AISLES: Aisle[] = [
   { id: 'surgeles', label: 'Surgelés', emoji: '🧊', order: 6 },
   { id: 'epicerie-salee', label: 'Épicerie salée', emoji: '🥫', order: 7 },
   { id: 'epicerie-sucree', label: 'Épicerie sucrée', emoji: '🍫', order: 8 },
-  { id: 'menager', label: 'Produits ménagers', emoji: '🧽', order: 9 },
-  { id: 'autre', label: 'Autre', emoji: '🛒', order: 10 }
+  { id: 'epices', label: 'Épices / aromates', emoji: '🌿', order: 9 },
+  { id: 'menager', label: 'Produits ménagers', emoji: '🧽', order: 10 },
+  { id: 'autre', label: 'Autre', emoji: '🛒', order: 11 }
 ];
 
 export const aisleById = (id: string): Aisle =>
@@ -25,8 +26,9 @@ const KEYWORDS: Record<string, string[]> = {
   'laiterie-dessert': ['yaourt', 'yogourt', 'compote', 'dessert', 'flan', 'fromage blanc', 'skyr'],
   liquides: ['eau', 'jus', 'soda', 'bière', 'biere', 'vin', 'sirop', 'coca', 'limonade'],
   surgeles: ['surgelé', 'surgele', 'glace', 'frites', 'pizza surgelée'],
-  'epicerie-salee': ['pâtes', 'pates', 'riz', 'farine', 'huile', 'vinaigre', 'sel', 'poivre', 'conserve', 'sauce', 'moutarde', 'ketchup', 'mayonnaise', 'lentille', 'pois chiche', 'semoule', 'bouillon', 'épice', 'thon', 'chips', 'pain'],
+  'epicerie-salee': ['pâtes', 'pates', 'riz', 'farine', 'huile', 'vinaigre', 'conserve', 'sauce', 'moutarde', 'ketchup', 'mayonnaise', 'lentille', 'pois chiche', 'semoule', 'bouillon', 'thon', 'chips', 'pain'],
   'epicerie-sucree': ['sucre', 'chocolat', 'café', 'cafe', 'thé', 'the', 'biscuit', 'gâteau', 'confiture', 'miel', 'céréales', 'cereales', 'nutella', 'bonbon'],
+  epices: ['épice', 'epice', 'sel', 'poivre', 'paprika', 'cumin', 'curry', 'curcuma', 'cannelle', 'muscade', 'herbes de provence', 'thym', 'laurier', 'origan', 'romarin', 'piment', 'gingembre', 'safran', 'vanille', 'clou de girofle', 'aromate', 'sésame'],
   menager: ['papier', 'sopalin', 'lessive', 'liquide vaisselle', 'éponge', 'eponge', 'savon', 'shampoing', 'dentifrice', 'sac poubelle', 'javel', 'nettoyant', 'pastille', 'mouchoir']
 };
 
