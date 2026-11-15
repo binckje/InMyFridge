@@ -28,21 +28,26 @@
   /* ---------- Filtres ---------- */
   type Filter = 'tout' | 'bas' | string;
   let filter = $state<Filter>('tout');
-  /** Filtre par sous-catégorie (id), tous emplacements confondus sauf si un emplacement est choisi. */
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  /** Clé de filtre d'une sous-catégorie : son nom, pour fusionner les homonymes de plusieurs emplacements. */
+  const catKey = (c: Category) => norm(c.label.trim());
+  /** Filtre par sous-catégorie (clé), tous emplacements confondus sauf si un emplacement est choisi. */
   let cat = $state<string | null>(null);
-  /** Sous-catégories de tous les emplacements, sans doublon (même id = même sous-catégorie). */
+  /** Sous-catégories de tous les emplacements, sans doublon (même nom = même sous-catégorie). */
   const allCategories = $derived.by(() => {
     const seen = new Map<string, Category>();
-    for (const l of LOCATIONS) for (const c of l.categories ?? []) if (!seen.has(c.id)) seen.set(c.id, c);
+    for (const l of LOCATIONS) for (const c of l.categories ?? []) if (!seen.has(catKey(c))) seen.set(catKey(c), c);
     return [...seen.values()];
   });
   // Sous-catégorie absente de l'emplacement choisi : on la retire.
   $effect(() => {
-    if (cat && target && !target.categories?.some((c) => c.id === cat)) cat = null;
+    if (cat && target && !target.categories?.some((c) => catKey(c) === cat)) cat = null;
   });
-  const catOf = (s: StockItem) => categoryOf(locationById(s.locationId), s.categoryId)?.id;
+  const catOf = (s: StockItem) => {
+    const c = categoryOf(locationById(s.locationId), s.categoryId);
+    return c && catKey(c);
+  };
   let text = $state('');
-  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   const low = $derived(all.filter(isBas));
   /** Produits épuisés sans seuil : masqués sauf pendant une recherche. */
@@ -74,7 +79,7 @@
    */
   const groups = $derived.by((): Group[] => {
     if (cat) {
-      const c = allCategories.find((c) => c.id === cat);
+      const c = allCategories.find((c) => catKey(c) === cat);
       return shown.length ? [{ key: `cat/${cat}`, title: c ? `${c.emoji} ${c.label}` : '', items: shown }] : [];
     }
     const loc = LOCATIONS.find((l) => l.id === filter);
@@ -330,7 +335,7 @@
   <div class="locs cats">
     <button class="chip" class:sel={!cat} onclick={() => (cat = null)}>Toutes</button>
     {#each target?.categories ?? allCategories as c (c.id)}
-      <button class="chip" class:sel={cat === c.id} onclick={() => (cat = cat === c.id ? null : c.id)}>{c.emoji} {c.label}</button>
+      <button class="chip" class:sel={cat === catKey(c)} onclick={() => (cat = cat === catKey(c) ? null : catKey(c))}>{c.emoji} {c.label}</button>
     {/each}
   </div>
 {/if}
