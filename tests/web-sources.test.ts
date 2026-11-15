@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanDomain, defaultSources, fromEdamam, fromSchema, fromVideo, ideasAll, importUrl, minutes, searchAll, sourceLabel, type Sources } from '../src/lib/web-sources';
+import { cleanDomain, defaultSources, fromEdamam, fromSchema, fromVideo, ideasAll, importUrl, minutes, searchAll, searchFocused, sourceLabel, type Sources } from '../src/lib/web-sources';
 // @ts-expect-error fichier JavaScript du Worker, sans types
 import worker, { links, recipesIn } from '../worker/worker.js';
 
@@ -127,6 +127,18 @@ describe('recherche unifiée', () => {
     const { picked } = await ideasAll(['sel', 'Blanc de poulet fermier', 'truc'], sources({ sites: [defaultSources().sites[0]], edamam: true }), () => 0);
     expect(picked).toEqual(['poulet']);
     expect(qs.sort()).toEqual(['chicken', 'poulet']);
+  });
+
+  it('recherche orientée : produit du stock + mots-clés, recettes sans le produit écartées', async () => {
+    const qs: string[] = [];
+    const without = { ...SCHEMA, name: 'Sans', recipeIngredient: ['200 g de riz', '1 oignon'] };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      qs.push(new URL(url).searchParams.get('q')!);
+      return { ok: true, json: async () => ({ results: [{ url: 'https://www.cuisineaz.com/a', recipe: { ...SCHEMA, recipeIngredient: ['2 blancs de poulet', '1 oignon'] } }, { url: 'https://www.cuisineaz.com/b', recipe: without }], items: [] }) };
+    }));
+    const { recipes } = await searchFocused('Blanc de poulet fermier', ['curry'], sources({ sites: [defaultSources().sites[0]], edamam: true }));
+    expect(qs.sort()).toEqual(['chicken curry', 'poulet curry']);
+    expect(recipes.map((r) => r.url)).toEqual(['https://www.cuisineaz.com/a']);
   });
 
   it('import par lien', async () => {
