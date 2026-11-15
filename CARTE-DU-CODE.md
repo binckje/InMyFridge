@@ -249,6 +249,7 @@ Fichier `.svelte.ts` car `LOCATIONS` est un `$state` réactif.
 - `fromVideo(video)` — vidéo YouTube → `Recipe` (id `yt-<id>`), seulement si la description annonce « Ingrédients ».
 - `fromEdamam(item)` — recette Edamam → `Recipe` (id `edamam-<id>`), refusée si un ingrédient n'est pas traduisible.
 - `searchAll(query)`, `ideasAll(stockNames)` → `WebResult` { recipes, errors } sur toutes les sources activées ; `sourceLabel(recipe)`. Recettes.
+- `searchFocused(produitDuStock, motsClés)` : recherche orientée (produit du stock et/ou mots-clés, recettes sans le produit écartées) ; `genericName`, `keywordList`. Panneau « Orienter » de Recettes ; sans produit ni mot-clé → `searchAll` / `ideasAll`.
 
 ### `worker/worker.js` — Worker Cloudflare (hors build)
 Relais sans dépendance, collé dans le tableau de bord Cloudflare. Routes `/`, `/recipe`, `/search`, `/youtube`, `/edamam` ; secrets `YOUTUBE_KEY`, `EDAMAM_ID`, `EDAMAM_KEY` ; origine vérifiée (`ALLOWED_ORIGINS`). Fonctions testées : `recipesIn(html)`, `links(html, base, domain, words)`. Notice : `worker/README.md`.

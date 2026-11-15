@@ -1,4 +1,4 @@
-import { isBasic, parseIngredient } from './recipes';
+import { isBasic, matches, parseIngredient, tokens } from './recipes';
 import { parseRecipeText } from './recipe-import';
 import { fetchReliable, frenchFood, ideasFromStock, measure, searchWeb, toEnglish, toFrench } from './web-recipes';
 import type { Recipe, RecipeIngredient } from './types';
@@ -336,6 +336,53 @@ export function searchAll(query: string, s = getSources()): Promise<WebResult> {
   if (s.youtube) jobs.push(['YouTube', () => searchYoutube(query, s.worker)]);
   if (s.edamam) jobs.push(['Edamam', () => searchEdamam(english(query), s.worker)]);
   return gather(jobs);
+}
+
+/** Nom générique d'un produit du stock : « Blanc de poulet fermier » → poulet (inconnu → tel quel). */
+export function genericName(name: string): string {
+  const en = toEnglish(name);
+  return en ? toFrench(en) : name.trim().toLowerCase();
+}
+
+/** Mots-clés saisis librement (« curry, rapide ») → liste de mots. */
+export const keywordList = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
+
+/** La recette contient-elle chaque mot-clé (nom, étiquettes, ingrédients ; français ou anglais) ? */
+function hasKeywords(r: Recipe, keywords: string[]): boolean {
+  const hay = tokens([r.name, ...(r.tags ?? []), ...r.ingredients.map((i) => i.name)].join(' '));
+  const name = r.name.toLowerCase();
+  return keywords.every((k) => {
+    const en = toEnglish(k);
+    return tokens(k).every((w) => hay.some((h) => h.startsWith(w))) || (!!en && name.includes(en));
+  });
+}
+
+/**
+ * Recherche orientée : un produit du stock et/ou des mots-clés.
+ * Les sites, YouTube et Edamam reçoivent le tout comme mots cherchés ; TheMealDB
+ * (un seul terme par requête) est interrogé terme par terme puis filtré par mots-clés.
+ * Avec un produit, seules les recettes qui le contiennent sont gardées.
+ */
+export async function searchFocused(ingredient: string, keywords: string[], s = getSources()): Promise<WebResult> {
+  const food = ingredient.trim() ? genericName(ingredient) : '';
+  const terms = [food, ...keywords].filter(Boolean);
+  if (!terms.length) return { recipes: [], errors: [] };
+  const query = terms.join(' ');
+  const jobs: [string, () => Promise<Recipe[]>][] = [];
+  if (s.mealdb)
+    jobs.push(['TheMealDB', async () => {
+      const lists = await Promise.all(terms.map(searchWeb));
+      // Recettes trouvées par le plus de termes d'abord
+      const count = new Map<string, number>();
+      for (const h of lists.flat()) count.set(h.id, (count.get(h.id) ?? 0) + 1);
+      const hits = lists.flat().filter((h, i, all) => all.findIndex((x) => x.id === h.id) === i).sort((a, b) => count.get(b.id)! - count.get(a.id)!);
+      return (await fetchReliable(hits)).filter((r) => hasKeywords(r, keywords));
+    }]);
+  for (const site of s.sites) if (site.on) jobs.push([site.name, () => searchSite(site, query, s.worker)]);
+  if (s.youtube) jobs.push(['YouTube', () => searchYoutube(query, s.worker)]);
+  if (s.edamam) jobs.push(['Edamam', () => searchEdamam(terms.map(english).join(' '), s.worker)]);
+  const found = await gather(jobs);
+  return food ? { ...found, recipes: found.recipes.filter((r) => r.ingredients.some((i) => matches(i.name, food))) } : found;
 }
 
 /**

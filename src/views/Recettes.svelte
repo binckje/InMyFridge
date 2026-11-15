@@ -4,8 +4,8 @@
   import { flip } from 'svelte/animate';
   import { thumb } from '../lib/media';
   import { db } from '../lib/db';
-  import { addMissingToShopping, CATEGORIES, categoryOf, checkRecipe, deleteRecipe, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
-  import { ideasAll, importUrl, searchAll, sourceLabel, type WebResult } from '../lib/web-sources';
+  import { addMissingToShopping, CATEGORIES, categoryOf, checkRecipe, deleteRecipe, isBasic, rank, saveRecipe, setCategory, tokens, type Category, type RecipeCheck } from '../lib/recipes';
+  import { genericName, ideasAll, importUrl, keywordList, searchAll, searchFocused, sourceLabel, type WebResult } from '../lib/web-sources';
   import type { Recipe } from '../lib/types';
   import RecipeSheet from './RecipeSheet.svelte';
   import RecipeEditor from './RecipeEditor.svelte';
@@ -195,6 +195,23 @@
     web = null;
   });
 
+  /** Recherche orientée : produit du stock et mots-clés, demandés avant de lancer. */
+  let orienting = $state(false);
+  let focusItem = $state('');
+  let keywords = $state('');
+  const stockNames = $derived(
+    [...new Set(($stock ?? []).map((s) => s.name.trim()).filter((n) => n && !isBasic(n)))].sort((a, b) => a.localeCompare(b, 'fr'))
+  );
+
+  /** Sans produit ni mot-clé : méthode normale (texte cherché, sinon idées depuis tout le stock). */
+  function launchWeb() {
+    orienting = false;
+    const words = keywordList(`${text} ${keywords}`);
+    if (!focusItem && !keywordList(keywords).length) return text.trim() ? searchOnline() : ideas();
+    const label = [focusItem && genericName(focusItem), ...words].filter(Boolean).join(' · ');
+    return runWeb(async () => ({ title: `« ${label} » sur internet`, ...(await searchFocused(focusItem, words)) }));
+  }
+
   function openWeb(r: Recipe) {
     if (($recipes ?? []).some((x) => x.id === r.id && !x.deleted)) return (openId = r.id);
     preview = r;
@@ -323,10 +340,29 @@
 {/if}
 
 <div class="web">
-  {#if text.trim()}
-    <button class="btn ghost" onclick={searchOnline} disabled={webBusy}>🌐 Chercher « {text.trim()} » sur internet</button>
+  {#if orienting}
+    <form class="orient" onsubmit={(e) => (e.preventDefault(), launchWeb())} transition:fade={{ duration: 120 }}>
+      <label>
+        Produit du stock à utiliser
+        <select bind:value={focusItem}>
+          <option value="">{text.trim() ? 'Aucun' : 'Tout le stock (idées)'}</option>
+          {#each stockNames as n}<option value={n}>{n}</option>{/each}
+        </select>
+      </label>
+      <label>
+        Mots-clés (facultatif)
+        <input bind:value={keywords} placeholder="curry, gratin, dessert…" enterkeyhint="search" autocomplete="off" />
+      </label>
+      <p class="hint">Sans produit ni mot-clé : recherche habituelle.</p>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick={() => (orienting = false)}>Annuler</button>
+        <button class="btn" disabled={!text.trim() && !focusItem && !keywordList(keywords).length && !stockNames.length}>🌐 Lancer</button>
+      </div>
+    </form>
   {:else}
-    <button class="btn ghost" onclick={ideas} disabled={webBusy || !($stock ?? []).length}>🌐 Idées sur internet avec mon stock</button>
+    <button class="btn ghost" onclick={() => (orienting = true)} disabled={webBusy}>
+      🌐 {text.trim() ? `Chercher « ${text.trim()} » sur internet` : 'Chercher des recettes sur internet'}
+    </button>
   {/if}
   <button class="link" onclick={() => (sourcing = true)}>⚙️ Sources internet</button>
   {#if webBusy}<p class="hint">Recherche…</p>{/if}
@@ -510,6 +546,10 @@
   .web h2 { margin: 10px 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
   .web h2 span { font-weight: 400; }
   .web .btn:disabled { opacity: 0.5; }
+  .orient { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--green-soft); }
+  .orient label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+  .orient .row { display: flex; gap: 8px; }
+  .orient .row .btn { flex: 1; }
   .web .shop { margin-top: 4px; width: 100%; font-size: 13px; }
   .web > .link { align-self: center; padding: 4px 8px; color: var(--muted); font-size: 14px; }
   .linkrow { display: flex; gap: 8px; }
