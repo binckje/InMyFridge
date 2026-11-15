@@ -2,7 +2,22 @@ import { liveQuery } from 'dexie';
 import { db, newId } from './db';
 import type { Category, Location, StoredLocation } from './types';
 
-/** Sous-catégories communes au réfrigérateur et au congélateur. */
+/**
+ * Sous-catégories épices / aromates, présentes dans tous les emplacements.
+ * Identifiants fixes : un même filtre et un même classement d'un emplacement à l'autre.
+ * Pas de variante « frais / surgelé » : l'état se déduit de l'emplacement.
+ */
+const SPICES: Category[] = [
+  { id: 'sel-poivre', label: 'Sel / poivre', emoji: '🧂' },
+  { id: 'epices', label: 'Épices', emoji: '🌶️' },
+  { id: 'herbes', label: 'Herbes séchées', emoji: '🌿' },
+  { id: 'aromates', label: 'Aromates', emoji: '🌱' },
+  { id: 'patisserie', label: 'Sucré / pâtisserie', emoji: '🍦' },
+  { id: 'melanges', label: 'Mélanges / bouillons', emoji: '🫙' }
+];
+const OTHER: Category = { id: 'autre', label: 'Autre', emoji: '📦' };
+
+/** Sous-catégories communes au réfrigérateur et au congélateur (avant les épices). */
 const COLD: Category[] = [
   { id: 'viandes', label: 'Viandes / poissons', emoji: '🥩' },
   { id: 'cremerie', label: 'Crémerie', emoji: '🧀' },
@@ -10,18 +25,20 @@ const COLD: Category[] = [
   { id: 'liquides', label: 'Liquides', emoji: '🧃' },
   { id: 'restes', label: 'Restes', emoji: '🍲' },
   { id: 'laiterie-epicerie', label: 'Laiterie / dessert / épicerie', emoji: '🍮' },
-  { id: 'autre', label: 'Autre', emoji: '📦' }
+  ...SPICES,
+  OTHER
 ];
+const SPICES_ONLY: Category[] = [...SPICES, OTHER];
 
 /** Emplacements par défaut (identifiants fixes, voir seedLocations). */
 export const DEFAULT_LOCATIONS: Location[] = [
   { id: 'frigo', label: 'Réfrigérateur', emoji: '🧊', categories: COLD },
   { id: 'congelateur', label: 'Congélateur', emoji: '❄️', categories: COLD },
-  { id: 'epicerie-salee', label: 'Épicerie salée', emoji: '🥫' },
-  { id: 'epicerie-sucree', label: 'Épicerie sucrée', emoji: '🍫' },
-  { id: 'epices', label: 'Épices / aromates', emoji: '🌿' },
-  { id: 'autres', label: 'Autres', emoji: '📦' },
-  { id: 'menager', label: 'Produits ménagers', emoji: '🧽' }
+  { id: 'epicerie-salee', label: 'Épicerie salée', emoji: '🥫', categories: SPICES_ONLY },
+  { id: 'epicerie-sucree', label: 'Épicerie sucrée', emoji: '🍫', categories: SPICES_ONLY },
+  { id: 'epices', label: 'Épices / aromates', emoji: '🌿', categories: SPICES_ONLY },
+  { id: 'autres', label: 'Autres', emoji: '📦', categories: SPICES_ONLY },
+  { id: 'menager', label: 'Produits ménagers', emoji: '🧽', categories: SPICES_ONLY }
 ];
 
 /**
@@ -51,6 +68,30 @@ export async function seedLocations() {
   let order = Math.max(-1, ...all.map((l) => l.order));
   const todo = DEFAULT_LOCATIONS.filter((l) => ADDED_LATER.includes(l.id) && !existing.has(l.id));
   if (todo.length) await db.locations.bulkAdd(todo.map((l) => ({ ...l, order: ++order, updatedAt: 0 })));
+  await addSpiceCategories(all);
+}
+
+/**
+ * Migration (une fois par appareil) : ajoute les sous-catégories épices à tous les
+ * emplacements existants, avant « Autre ». Ignore celles déjà présentes (même id ou même nom).
+ */
+async function addSpiceCategories(all: StoredLocation[]) {
+  const KEY = 'imf.migr.spiceCategories';
+  try { if (localStorage.getItem(KEY)) return; } catch { /* stockage indisponible */ }
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const now = Date.now();
+  const changed = all.filter((l) => !l.deleted).flatMap((l) => {
+    const cats = [...(l.categories ?? [])];
+    const has = (c: Category) => cats.some((x) => x.id === c.id || norm(x.label) === norm(c.label));
+    const missing = SPICES.filter((c) => !has(c));
+    if (!missing.length && has(OTHER)) return [];
+    const other = cats.findIndex((c) => c.id === OTHER.id);
+    cats.splice(other < 0 ? cats.length : other, 0, ...missing);
+    if (!has(OTHER)) cats.push(OTHER);
+    return [{ ...l, categories: cats, updatedAt: now }];
+  });
+  if (changed.length) await db.locations.bulkPut(changed);
+  try { localStorage.setItem(KEY, '1'); } catch { /* stockage indisponible */ }
 }
 
 export const locationById = (id: string): Location => LOCATIONS.find((l) => l.id === id) ?? LOCATIONS[0];
@@ -71,7 +112,7 @@ export function guessLocation(aisleId: string): string {
   return locationById(map[aisleId] ?? 'frigo').id;
 }
 
-/** Sous-catégorie probable (frigo / congélateur) d'après le rayon deviné. */
+/** Sous-catégorie probable d'après le rayon deviné (« Autre » si absente de l'emplacement). */
 export function guessCategory(aisleId: string): string {
   switch (aisleId) {
     case 'viandes-poissons': return 'viandes';
@@ -81,6 +122,7 @@ export function guessCategory(aisleId: string): string {
     case 'laiterie-dessert':
     case 'epicerie-salee':
     case 'epicerie-sucree': return 'laiterie-epicerie';
+    case 'epices': return 'epices';
     default: return 'autre';
   }
 }

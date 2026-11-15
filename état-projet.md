@@ -20,12 +20,15 @@ Structure **configurable** (emplacements et catégories modifiables, ajout/suppr
 
 | # | Emplacement | Sous-catégories |
 |---|-------------|-----------------|
-| 1 | Réfrigérateur | A Viandes / poissons · B Crémerie · C Fruits et légumes · D Liquides · E Restes · F Laiterie / dessert / épicerie salée, sucrée · G Autre |
+| 1 | Réfrigérateur | A Viandes / poissons · B Crémerie · C Fruits et légumes · D Liquides · E Restes · F Laiterie / dessert / épicerie salée, sucrée · + épices (voir ci-dessous) · Autre |
 | 2 | Congélateur | Mêmes sous-catégories que le réfrigérateur |
-| 3 | Épicerie sèche salée | — |
-| 4 | Épicerie sèche sucrée | — |
-| 5 | Autres | — |
-| 6 | Produits ménagers | — |
+| 3 | Épicerie sèche salée | Épices (voir ci-dessous) · Autre |
+| 4 | Épicerie sèche sucrée | Épices · Autre |
+| 5 | Épices / aromates | Épices · Autre |
+| 6 | Autres | Épices · Autre |
+| 7 | Produits ménagers | Épices · Autre |
+
+Sous-catégories épices, **communes à tous les emplacements** (mêmes identifiants, un seul filtre) : Sel / poivre · Épices · Herbes séchées · Aromates · Sucré / pâtisserie · Mélanges / bouillons. Pas de variante frais / surgelé : l'état se déduit de l'emplacement. Les utilisateurs existants les reçoivent par une migration unique (par appareil).
 
 ## 2. Quantités
 
